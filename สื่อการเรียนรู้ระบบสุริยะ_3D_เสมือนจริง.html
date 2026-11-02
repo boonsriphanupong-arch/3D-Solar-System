@@ -1,0 +1,425 @@
+<!-- ... existing code ... -->
+<body class="relative w-screen h-screen overflow-hidden bg-space-950 text-slate-100 flex flex-col">
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- GLOBAL AUDIO SYNTHESIZER SOUND ENGINE -->
+    <script>
+        const SoundFX = {
+<!-- ... existing code ... -->
+        };
+
+        // TOAST NOTIFICATION HELPER
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            let bg = 'bg-sky-600 border-sky-400';
+            let icon = 'fa-circle-info';
+            if (type === 'success') { bg = 'bg-emerald-600 border-emerald-400'; icon = 'fa-circle-check'; }
+            else if (type === 'error') { bg = 'bg-rose-600 border-rose-400'; icon = 'fa-triangle-exclamation'; }
+            toast.className = `${bg} text-white text-xs font-semibold px-4 py-2.5 rounded-xl border shadow-xl flex items-center space-x-2 pointer-events-auto transition-all duration-300 opacity-0 transform translate-y-2`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.remove('opacity-0', 'translate-y-2'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+    </script>
+
+    <!-- TOP NAVIGATION & APP HEADER MODE SWITCHER -->
+<!-- ... existing code ... -->
+    <!-- TEXTURE MANAGER & UPLOAD MODAL -->
+    <div id="texture-modal" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+        <div class="relative w-full max-w-lg glass-panel p-6 rounded-3xl border border-amber-500/30 shadow-2xl space-y-5 my-auto">
+            
+            <!-- Header -->
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-950 flex items-center justify-center font-bold text-lg shadow-lg">
+                        <i class="fa-solid fa-images"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">ศูนย์เปลี่ยนภาพพื้นผิว 3D (Texture Manager)</h3>
+                        <p class="text-[11px] text-slate-400">อัปโหลดรูปภาพหรือเลือกสไตล์พื้นผิวสำเร็จรูปได้ในคลิกเดียว</p>
+                    </div>
+                </div>
+                <button onclick="SoundFX.playClick(); closeTextureModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Built-in HD Preset Styles Switcher Section -->
+            <div class="space-y-2">
+                <label class="text-xs font-bold text-amber-300 block">🎨 สไตล์พื้นผิวสำเร็จรูป (Built-in HD Preset Styles):</label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <button onclick="applyProceduralStyle('natural')" class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 font-bold flex flex-col items-center justify-center space-y-1 transition hover:scale-105 shadow">
+                        <span class="text-lg">🪐</span>
+                        <span class="text-[11px]">ภาพจริงเสมือน</span>
+                    </button>
+                    <button onclick="applyProceduralStyle('topo')" class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 font-bold flex flex-col items-center justify-center space-y-1 transition hover:scale-105 shadow">
+                        <span class="text-lg">🗺️</span>
+                        <span class="text-[11px]">ภูมิประเทศ</span>
+                    </button>
+                    <button onclick="applyProceduralStyle('infrared')" class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 font-bold flex flex-col items-center justify-center space-y-1 transition hover:scale-105 shadow">
+                        <span class="text-lg">🔴</span>
+                        <span class="text-[11px]">อินฟราเรด</span>
+                    </button>
+                    <button onclick="applyProceduralStyle('vintage')" class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 font-bold flex flex-col items-center justify-center space-y-1 transition hover:scale-105 shadow">
+                        <span class="text-lg">📜</span>
+                        <span class="text-[11px]">วินเทจโบราณ</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Target Planet Selector -->
+            <div class="space-y-1.5 pt-1 border-t border-slate-800">
+                <label class="text-xs font-bold text-amber-300 block">1. เลือกดาวเคราะห์หรือวัตถุอวกาศที่ต้องการอัปโหลดภาพ:</label>
+                <select id="texture-planet-select" onchange="updateTextureModalPreview()" class="w-full bg-slate-900 border border-slate-700 text-xs font-bold rounded-xl p-2.5 text-sky-300 focus:outline-none focus:border-amber-400">
+                    <option value="sun">☀️ ดวงอาทิตย์ (Sun)</option>
+                    <option value="mercury">🪐 ดาวพุธ (Mercury)</option>
+                    <option value="venus">🪐 ดาวศุกร์ (Venus)</option>
+                    <option value="earth" selected>🌍 โลก (Earth)</option>
+                    <option value="mars">🔴 ดาวอังคาร (Mars)</option>
+                    <option value="jupiter">🟠 ดาวพฤหัสบดี (Jupiter)</option>
+                    <option value="saturn">🪐 ดาวเสาร์ (Saturn)</option>
+                    <option value="uranus">🩵 ดาวยูเรนัส (Uranus)</option>
+                    <option value="neptune">🔵 ดาวเนปจูน (Neptune)</option>
+                    <option value="pluto">🟣 ดาวพลูโต (Pluto)</option>
+                </select>
+            </div>
+
+            <!-- Preview & Status -->
+            <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-400">สถานะพื้นผิวปัจจุบัน:</span>
+                    <span id="texture-status-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">ใช้งานภาพเริ่มต้น</span>
+                </div>
+                <div class="text-xs font-bold text-white flex items-center space-x-1.5">
+                    <span>ดาวเป้าหมาย:</span>
+                    <span id="texture-target-name" class="text-amber-400">โลก (Earth)</span>
+                </div>
+                <div class="relative w-full h-32 rounded-xl overflow-hidden bg-black/60 border border-slate-800 flex items-center justify-center">
+                    <img id="texture-preview-img" src="" alt="Texture Preview" class="w-full h-full object-cover hidden">
+                    <p id="texture-preview-placeholder" class="text-xs text-slate-500 italic">แสดงตัวอย่างภาพที่อัปโหลดเมื่อเลือกไฟล์</p>
+                </div>
+            </div>
+
+            <!-- Drag & Drop / File Selector Box -->
+            <div id="drop-zone" ondragover="event.preventDefault(); this.classList.add('border-amber-400')" ondragleave="this.classList.remove('border-amber-400')" ondrop="handleTextureDrop(event)" class="border-2 border-dashed border-slate-700 hover:border-amber-400 rounded-2xl p-5 text-center bg-slate-900/50 transition cursor-pointer space-y-2" onclick="document.getElementById('texture-file-input').click()">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-amber-400 animate-bounce"></i>
+                <div class="text-xs text-slate-200 font-medium">
+                    ลากรูปภาพมาวางที่นี่ หรือ <span class="text-amber-400 font-bold underline">คลิกเพื่อเลือกไฟล์</span>
+                </div>
+                <p class="text-[10px] text-slate-400">รองรับไฟล์ .JPG, .PNG, .WEBP (ระบบจะแปลงเป็น Base64 Data URL โดยอัตโนมัติ)</p>
+                <input type="file" id="texture-file-input" accept="image/jpeg, image/png, image/webp" onchange="handleTextureFileInput(event)" class="hidden">
+            </div>
+
+            <!-- Useful Tips / External Resources -->
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 leading-relaxed flex items-start space-x-2">
+                <i class="fa-solid fa-circle-info text-sky-400 mt-0.5 flex-shrink-0"></i>
+                <div>
+                    <strong>คำแนะนำ:</strong> ดาวน์โหลดภาพ Flat Texture Map ฟรีได้ที่ <a href="https://www.solarsystemscope.com/textures/" target="_blank" class="text-amber-400 underline font-semibold">Solar System Scope</a> หรือภาพถ่ายดาวเคราะห์จาก <a href="https://visibleearth.nasa.gov/" target="_blank" class="text-sky-400 underline font-semibold">NASA Visible Earth</a>
+                </div>
+            </div>
+
+            <!-- Actions Footer -->
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-800 text-xs">
+                <div class="flex items-center space-x-1.5">
+                    <button onclick="SoundFX.playClick(); resetPlanetTexture()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-medium transition">
+                        <i class="fa-solid fa-rotate-left mr-1"></i> คืนค่าดาวนี้
+                    </button>
+                    <button onclick="SoundFX.playClick(); resetAllPlanetTextures()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 font-medium transition">
+                        <i class="fa-solid fa-trash-can mr-1"></i> ล้างทั้งหมด
+                    </button>
+                </div>
+                <button onclick="SoundFX.playClick(); closeTextureModal()" class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold transition">
+                    เสร็จสิ้น
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT ENGINE -->
+    <script>
+<!-- ... existing code ... -->
+        /* ==========================================================================
+           8. CUSTOM TEXTURE UPLOADER & MANAGER LOGIC WITH BASE64 & PRESET STYLES
+           ========================================================================== */
+        let originalTextures = {};
+        let customTextureURLs = {};
+
+        // PRESET TEXTURE GENERATORS
+        function applyProceduralStyle(styleName, planetIdFilter = null) {
+            const targets = planetIdFilter ? [planetIdFilter] : Object.keys(CELESTIAL_DATA);
+
+            targets.forEach(key => {
+                if (key === 'asteroid_belt' || key === 'kuiper_belt' || key === 'oort_cloud') return;
+                const mesh = celestialMeshes[key];
+                if (!mesh || !mesh.material) return;
+
+                if (!originalTextures[key]) {
+                    originalTextures[key] = mesh.material.map;
+                }
+
+                const newTex = generatePresetTexture(key, styleName);
+                if (newTex) {
+                    if (THREE.sRGBEncoding) newTex.encoding = THREE.sRGBEncoding;
+                    if (THREE.SRGBColorSpace) newTex.colorSpace = THREE.SRGBColorSpace;
+                    newTex.needsUpdate = true;
+                    mesh.material.map = newTex;
+                    mesh.material.needsUpdate = true;
+                    delete customTextureURLs[key];
+                }
+            });
+
+            updateTextureModalPreview();
+            SoundFX.playCorrect();
+            const styleNamesTh = {
+                natural: 'ภาพจริงเสมือน (Natural)',
+                topo: 'แผนที่ภูมิประเทศ (Topo)',
+                infrared: 'อินฟราเรดถ่ายความร้อน (Infrared)',
+                vintage: 'แผนที่วินเทจโบราณ (Vintage Atlas)'
+            };
+            showToast(`ปรับสไตล์พื้นผิวเป็น "${styleNamesTh[styleName] || styleName}" สำเร็จ!`, 'success');
+        }
+
+        function generatePresetTexture(key, style) {
+            if (style === 'natural') {
+                return createDefaultTexture(key);
+            }
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            if (style === 'topo') {
+                const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                grad.addColorStop(0, '#0f172a'); grad.addColorStop(0.25, '#0284c7');
+                grad.addColorStop(0.5, '#10b981'); grad.addColorStop(0.75, '#eab308');
+                grad.addColorStop(1, '#ef4444');
+                ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 25; i++) {
+                    ctx.beginPath();
+                    ctx.ellipse(Math.random() * canvas.width, Math.random() * canvas.height, 40 + Math.random() * 150, 20 + Math.random() * 80, Math.random(), 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            } else if (style === 'infrared') {
+                const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                grad.addColorStop(0, '#312e81'); grad.addColorStop(0.3, '#7e22ce');
+                grad.addColorStop(0.6, '#ec4899'); grad.addColorStop(0.8, '#f97316');
+                grad.addColorStop(1, '#facc15');
+                ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                for (let i = 0; i < 300; i++) {
+                    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(56, 189, 248, 0.6)' : 'rgba(255, 255, 255, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 10, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (style === 'vintage') {
+                ctx.fillStyle = '#fef3c7'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#78350f';
+                for (let i = 0; i < 40; i++) {
+                    ctx.beginPath();
+                    ctx.ellipse(Math.random() * canvas.width, Math.random() * canvas.height, 30 + Math.random() * 100, 15 + Math.random() * 50, Math.random(), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.strokeStyle = '#92400e'; ctx.lineWidth = 1;
+                for (let x = 0; x < canvas.width; x += 64) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+                }
+                for (let y = 0; y < canvas.height; y += 64) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+                }
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createDefaultTexture(key) {
+            if (key === 'sun') return createSunTexture();
+            if (key === 'mercury') return createMercuryTexture();
+            if (key === 'venus') return createVenusTexture();
+            if (key === 'earth') return createEarthTexture();
+            if (key === 'mars') return createMarsTexture();
+            if (key === 'jupiter') return createJupiterTexture();
+            if (key === 'saturn') return createSaturnTexture();
+            if (key === 'uranus') return createUranusTexture();
+            if (key === 'neptune') return createNeptuneTexture();
+            if (key === 'pluto') return createPlutoTexture();
+            return createMercuryTexture();
+        }
+
+        function openTextureModal(planetId = null) {
+            const modal = document.getElementById('texture-modal');
+            modal.classList.remove('hidden');
+            const select = document.getElementById('texture-planet-select');
+            if (planetId && select) {
+                select.value = planetId;
+            } else if (selectedObjectId && select && CELESTIAL_DATA[selectedObjectId]) {
+                select.value = selectedObjectId;
+            }
+            updateTextureModalPreview();
+        }
+
+        function closeTextureModal() {
+            document.getElementById('texture-modal').classList.add('hidden');
+        }
+
+        function openTextureModalForCurrent() {
+            if (selectedObjectId && CELESTIAL_DATA[selectedObjectId]) {
+                openTextureModal(selectedObjectId);
+            } else {
+                openTextureModal('earth');
+            }
+        }
+
+        function updateTextureModalPreview() {
+            const select = document.getElementById('texture-planet-select');
+            if (!select) return;
+            const planetId = select.value;
+            const data = CELESTIAL_DATA[planetId];
+            if (!data) return;
+
+            document.getElementById('texture-target-name').innerText = `${data.nameTh} (${data.nameEn})`;
+            const currentUrl = customTextureURLs[planetId];
+            const previewImg = document.getElementById('texture-preview-img');
+            const placeholder = document.getElementById('texture-preview-placeholder');
+            const badge = document.getElementById('texture-status-badge');
+            const drawerBadge = document.getElementById('drawer-texture-badge');
+
+            if (currentUrl) {
+                previewImg.src = currentUrl;
+                previewImg.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                badge.innerText = 'ใช้งานภาพที่อัปโหลด';
+                badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800';
+                if (drawerBadge && selectedObjectId === planetId) {
+                    drawerBadge.innerText = 'Custom Texture';
+                    drawerBadge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800';
+                }
+            } else {
+                previewImg.src = '';
+                previewImg.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                badge.innerText = 'ใช้งานภาพเริ่มต้น';
+                badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700';
+                if (drawerBadge && selectedObjectId === planetId) {
+                    drawerBadge.innerText = 'Texture ปกติ';
+                    drawerBadge.className = 'text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400';
+                }
+            }
+        }
+
+        function handleTextureFileInput(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const planetId = document.getElementById('texture-planet-select').value;
+                applyTextureFile(planetId, file);
+            }
+        }
+
+        function handleTextureDrop(e) {
+            e.preventDefault();
+            document.getElementById('drop-zone').classList.remove('border-amber-400');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                const planetId = document.getElementById('texture-planet-select').value;
+                applyTextureFile(planetId, e.dataTransfer.files[0]);
+            }
+        }
+
+        // RELIABLE BASE64 DATA URL TEXTURE APPLIER
+        function applyTextureFile(planetId, file) {
+            if (!file || !CELESTIAL_DATA[planetId]) return;
+            const mesh = celestialMeshes[planetId];
+            if (!mesh) {
+                showToast('ไม่พบโมเดล 3D ของดาวดวงนี้', 'error');
+                return;
+            }
+
+            // Target core planet body mesh
+            let coreMesh = mesh;
+            if (!coreMesh.material && coreMesh.children.length > 0) {
+                coreMesh = coreMesh.children.find(c => c.isMesh && c.material) || coreMesh;
+            }
+
+            // Save initial texture if not saved
+            if (!originalTextures[planetId]) {
+                originalTextures[planetId] = coreMesh.material.map;
+            }
+
+            // Read file as Base64 Data URL to bypass iframe blob/CORS restrictions
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const dataUrl = e.target.result;
+                const loader = new THREE.TextureLoader();
+                
+                loader.load(
+                    dataUrl,
+                    (texture) => {
+                        if (THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
+                        if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+                        texture.needsUpdate = true;
+
+                        coreMesh.material.map = texture;
+                        coreMesh.material.needsUpdate = true;
+                        customTextureURLs[planetId] = dataUrl;
+
+                        updateTextureModalPreview();
+                        SoundFX.playCorrect();
+                        showToast(`เปลี่ยนภาพพื้นผิว 3D ของ ${CELESTIAL_DATA[planetId].nameTh} สำเร็จ!`, 'success');
+                    },
+                    undefined,
+                    (err) => {
+                        console.error('Texture load error:', err);
+                        SoundFX.playWrong();
+                        showToast('ไม่สามารถอ่านไฟล์รูปภาพได้ โปรดใช้ไฟล์ .JPG หรือ .PNG', 'error');
+                        coreMesh.material.map = originalTextures[planetId] || coreMesh.material.map;
+                        coreMesh.material.needsUpdate = true;
+                    }
+                );
+            };
+
+            reader.onerror = function() {
+                SoundFX.playWrong();
+                showToast('เกิดข้อผิดพลาดในการเปิดไฟล์ภาพ', 'error');
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function resetPlanetTexture(planetId = null) {
+            const targetId = planetId || document.getElementById('texture-planet-select').value;
+            const mesh = celestialMeshes[targetId];
+            if (mesh && originalTextures[targetId]) {
+                mesh.material.map = originalTextures[targetId];
+                mesh.material.needsUpdate = true;
+                delete customTextureURLs[targetId];
+                updateTextureModalPreview();
+                SoundFX.playClick();
+                showToast(`คืนค่าพื้นผิวเดิมของ ${CELESTIAL_DATA[targetId].nameTh} เรียบร้อย`, 'info');
+            }
+        }
+
+        function resetAllPlanetTextures() {
+            Object.keys(originalTextures).forEach(id => {
+                if (celestialMeshes[id] && originalTextures[id]) {
+                    celestialMeshes[id].material.map = originalTextures[id];
+                    celestialMeshes[id].material.needsUpdate = true;
+                }
+            });
+            customTextureURLs = {};
+            updateTextureModalPreview();
+            SoundFX.playClick();
+            showToast('คืนค่าพื้นผิวเดิมของดาวทุกดวงเรียบร้อย', 'info');
+        }
+    </script>
+</body>
+</html>
