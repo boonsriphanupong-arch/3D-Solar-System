@@ -1,425 +1,1653 @@
-<!-- ... existing code ... -->
-<body class="relative w-screen h-screen overflow-hidden bg-space-950 text-slate-100 flex flex-col">
-
-    <!-- TOAST NOTIFICATION CONTAINER -->
-    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
-
-    <!-- GLOBAL AUDIO SYNTHESIZER SOUND ENGINE -->
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สื่อการเรียนรู้วิชาโลกดาราศาสตร์ - ระบบสุริยะ 3 มิติ (Solar System 3D Explorer)</title>
+    
+    <!-- Google Fonts: Prompt -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        const SoundFX = {
-<!-- ... existing code ... -->
-        };
-
-        // TOAST NOTIFICATION HELPER
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-            const toast = document.createElement('div');
-            let bg = 'bg-sky-600 border-sky-400';
-            let icon = 'fa-circle-info';
-            if (type === 'success') { bg = 'bg-emerald-600 border-emerald-400'; icon = 'fa-circle-check'; }
-            else if (type === 'error') { bg = 'bg-rose-600 border-rose-400'; icon = 'fa-triangle-exclamation'; }
-            toast.className = `${bg} text-white text-xs font-semibold px-4 py-2.5 rounded-xl border shadow-xl flex items-center space-x-2 pointer-events-auto transition-all duration-300 opacity-0 transform translate-y-2`;
-            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => { toast.classList.remove('opacity-0', 'translate-y-2'); }, 10);
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-2');
-                setTimeout(() => toast.remove(), 300);
-            }, 3200);
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'sans-serif'],
+                    },
+                    colors: {
+                        space: {
+                            950: '#050711',
+                            900: '#0b0f24',
+                            800: '#131a3a',
+                            700: '#1d2754',
+                        },
+                        cyanGlow: '#00f0ff',
+                        goldGlow: '#ffb700',
+                    }
+                }
+            }
         }
     </script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #050711;
+            color: #e2e8f0;
+            overflow: hidden;
+            user-select: none;
+        }
 
-    <!-- TOP NAVIGATION & APP HEADER MODE SWITCHER -->
-<!-- ... existing code ... -->
-    <!-- TEXTURE MANAGER & UPLOAD MODAL -->
-    <div id="texture-modal" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-        <div class="relative w-full max-w-lg glass-panel p-6 rounded-3xl border border-amber-500/30 shadow-2xl space-y-5 my-auto">
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(11, 15, 36, 0.7);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.5);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.9);
+        }
+
+        /* 3D Floating Labels */
+        .planet-label {
+            position: absolute;
+            z-index: 10;
+            transform: translate(-50%, -100%);
+            pointer-events: auto;
+            cursor: pointer;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        .planet-label:hover {
+            transform: translate(-50%, -115%) scale(1.08);
+        }
+
+        /* Glassmorphism Effect */
+        .glass-panel {
+            background: rgba(11, 15, 36, 0.82);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .glass-card {
+            background: rgba(19, 26, 58, 0.65);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Audio Visualizer Pulse */
+        @keyframes sound-wave {
+            0%, 100% { height: 4px; }
+            50% { height: 16px; }
+        }
+        .animate-wave-1 { animation: sound-wave 1.2s infinite ease-in-out; }
+        .animate-wave-2 { animation: sound-wave 0.8s infinite ease-in-out 0.2s; }
+        .animate-wave-3 { animation: sound-wave 1.5s infinite ease-in-out 0.4s; }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden text-slate-100">
+
+    <!-- 3D WebGL Canvas -->
+    <div id="canvas-container" class="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"></div>
+
+    <!-- 2D Overlay Container for 3D Floating Labels -->
+    <div id="labels-container" class="absolute inset-0 pointer-events-none z-10 overflow-hidden"></div>
+
+    <!-- Header Navigation Bar -->
+    <header class="absolute top-0 left-0 w-full z-20 p-3 sm:p-4 pointer-events-none">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 pointer-events-auto">
             
-            <!-- Header -->
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div class="flex items-center space-x-2.5">
-                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-950 flex items-center justify-center font-bold text-lg shadow-lg">
-                        <i class="fa-solid fa-images"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-bold text-white">ศูนย์เปลี่ยนภาพพื้นผิว 3D (Texture Manager)</h3>
-                        <p class="text-[11px] text-slate-400">อัปโหลดรูปภาพหรือเลือกสไตล์พื้นผิวสำเร็จรูปได้ในคลิกเดียว</p>
-                    </div>
+            <!-- Branding -->
+            <div class="flex items-center space-x-3 glass-panel px-4 py-2 rounded-2xl shadow-xl border border-cyan-500/30">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-300 flex items-center justify-center shadow-lg shadow-orange-500/30">
+                    <i class="fa-solid fa-sun text-white text-xl animate-spin-slow"></i>
                 </div>
-                <button onclick="SoundFX.playClick(); closeTextureModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <!-- Built-in HD Preset Styles Switcher Section -->
-            <div class="space-y-2">
-                <label class="text-xs font-bold text-amber-300 block">🎨 สไตล์พื้นผิวสำเร็จรูป (Built-in HD Preset Styles):</label>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <button onclick="applyProceduralStyle('natural')" class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 font-bold flex flex-col items-center justify-center space-y-1 transition hover:scale-105 shadow">
-                        <span class="text-lg">🪐</span>
-                        <span class="text-[11px]">ภาพจริงเสมือน</span>
-                    </button>
-                    <button onclick="applyProceduralStyle('topo')" class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 font-bold flex flex-col items-center justify-center space-y-1 transition hover:scale-105 shadow">
-                        <span class="text-lg">🗺️</span>
-                        <span class="text-[11px]">ภูมิประเทศ</span>
-                    </button>
-                    <button onclick="applyProceduralStyle('infrared')" class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 font-bold flex flex-col items-center justify-center space-y-1 transition hover:scale-105 shadow">
-                        <span class="text-lg">🔴</span>
-                        <span class="text-[11px]">อินฟราเรด</span>
-                    </button>
-                    <button onclick="applyProceduralStyle('vintage')" class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 font-bold flex flex-col items-center justify-center space-y-1 transition hover:scale-105 shadow">
-                        <span class="text-lg">📜</span>
-                        <span class="text-[11px]">วินเทจโบราณ</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Target Planet Selector -->
-            <div class="space-y-1.5 pt-1 border-t border-slate-800">
-                <label class="text-xs font-bold text-amber-300 block">1. เลือกดาวเคราะห์หรือวัตถุอวกาศที่ต้องการอัปโหลดภาพ:</label>
-                <select id="texture-planet-select" onchange="updateTextureModalPreview()" class="w-full bg-slate-900 border border-slate-700 text-xs font-bold rounded-xl p-2.5 text-sky-300 focus:outline-none focus:border-amber-400">
-                    <option value="sun">☀️ ดวงอาทิตย์ (Sun)</option>
-                    <option value="mercury">🪐 ดาวพุธ (Mercury)</option>
-                    <option value="venus">🪐 ดาวศุกร์ (Venus)</option>
-                    <option value="earth" selected>🌍 โลก (Earth)</option>
-                    <option value="mars">🔴 ดาวอังคาร (Mars)</option>
-                    <option value="jupiter">🟠 ดาวพฤหัสบดี (Jupiter)</option>
-                    <option value="saturn">🪐 ดาวเสาร์ (Saturn)</option>
-                    <option value="uranus">🩵 ดาวยูเรนัส (Uranus)</option>
-                    <option value="neptune">🔵 ดาวเนปจูน (Neptune)</option>
-                    <option value="pluto">🟣 ดาวพลูโต (Pluto)</option>
-                </select>
-            </div>
-
-            <!-- Preview & Status -->
-            <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-2">
-                <div class="flex items-center justify-between text-xs">
-                    <span class="text-slate-400">สถานะพื้นผิวปัจจุบัน:</span>
-                    <span id="texture-status-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">ใช้งานภาพเริ่มต้น</span>
-                </div>
-                <div class="text-xs font-bold text-white flex items-center space-x-1.5">
-                    <span>ดาวเป้าหมาย:</span>
-                    <span id="texture-target-name" class="text-amber-400">โลก (Earth)</span>
-                </div>
-                <div class="relative w-full h-32 rounded-xl overflow-hidden bg-black/60 border border-slate-800 flex items-center justify-center">
-                    <img id="texture-preview-img" src="" alt="Texture Preview" class="w-full h-full object-cover hidden">
-                    <p id="texture-preview-placeholder" class="text-xs text-slate-500 italic">แสดงตัวอย่างภาพที่อัปโหลดเมื่อเลือกไฟล์</p>
-                </div>
-            </div>
-
-            <!-- Drag & Drop / File Selector Box -->
-            <div id="drop-zone" ondragover="event.preventDefault(); this.classList.add('border-amber-400')" ondragleave="this.classList.remove('border-amber-400')" ondrop="handleTextureDrop(event)" class="border-2 border-dashed border-slate-700 hover:border-amber-400 rounded-2xl p-5 text-center bg-slate-900/50 transition cursor-pointer space-y-2" onclick="document.getElementById('texture-file-input').click()">
-                <i class="fa-solid fa-cloud-arrow-up text-3xl text-amber-400 animate-bounce"></i>
-                <div class="text-xs text-slate-200 font-medium">
-                    ลากรูปภาพมาวางที่นี่ หรือ <span class="text-amber-400 font-bold underline">คลิกเพื่อเลือกไฟล์</span>
-                </div>
-                <p class="text-[10px] text-slate-400">รองรับไฟล์ .JPG, .PNG, .WEBP (ระบบจะแปลงเป็น Base64 Data URL โดยอัตโนมัติ)</p>
-                <input type="file" id="texture-file-input" accept="image/jpeg, image/png, image/webp" onchange="handleTextureFileInput(event)" class="hidden">
-            </div>
-
-            <!-- Useful Tips / External Resources -->
-            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400 leading-relaxed flex items-start space-x-2">
-                <i class="fa-solid fa-circle-info text-sky-400 mt-0.5 flex-shrink-0"></i>
                 <div>
-                    <strong>คำแนะนำ:</strong> ดาวน์โหลดภาพ Flat Texture Map ฟรีได้ที่ <a href="https://www.solarsystemscope.com/textures/" target="_blank" class="text-amber-400 underline font-semibold">Solar System Scope</a> หรือภาพถ่ายดาวเคราะห์จาก <a href="https://visibleearth.nasa.gov/" target="_blank" class="text-sky-400 underline font-semibold">NASA Visible Earth</a>
+                    <h1 class="font-bold text-base sm:text-lg leading-tight bg-gradient-to-r from-cyan-300 via-sky-100 to-amber-300 bg-clip-text text-transparent">
+                        ระบบสุริยะ 3 มิติ (3D Explorer)
+                    </h1>
+                    <p class="text-[11px] text-slate-400 font-light">สื่อการเรียนรู้วิชาโลก ดาราศาสตร์ และอวกาศ</p>
                 </div>
             </div>
 
-            <!-- Actions Footer -->
-            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-800 text-xs">
-                <div class="flex items-center space-x-1.5">
-                    <button onclick="SoundFX.playClick(); resetPlanetTexture()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-medium transition">
-                        <i class="fa-solid fa-rotate-left mr-1"></i> คืนค่าดาวนี้
-                    </button>
-                    <button onclick="SoundFX.playClick(); resetAllPlanetTextures()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 font-medium transition">
-                        <i class="fa-solid fa-trash-can mr-1"></i> ล้างทั้งหมด
-                    </button>
+            <!-- Quick Navigation Dropdown & Category Filters -->
+            <div class="flex items-center space-x-2 glass-panel p-1.5 rounded-2xl shadow-xl flex-wrap">
+                
+                <!-- Category Quick Filters -->
+                <div class="hidden lg:flex items-center space-x-1 mr-2 border-r border-slate-700/60 pr-2">
+                    <button onclick="filterCategory('all')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:bg-space-800 transition">ทั้งหมด</button>
+                    <button onclick="filterCategory('rocky')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-amber-300 hover:bg-space-800 transition"><i class="fa-solid fa-gem mr-1"></i>หิน</button>
+                    <button onclick="filterCategory('gas')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-cyan-300 hover:bg-space-800 transition"><i class="fa-solid fa-cloud mr-1"></i>แก๊ส</button>
+                    <button onclick="filterCategory('belts')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-purple-300 hover:bg-space-800 transition"><i class="fa-solid fa-ring mr-1"></i>ขอบเขต</button>
                 </div>
-                <button onclick="SoundFX.playClick(); closeTextureModal()" class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold transition">
-                    เสร็จสิ้น
+
+                <!-- Dropdown Selector -->
+                <div class="relative">
+                    <select id="celestial-select" onchange="focusOnObject(this.value)" class="bg-space-900/90 text-cyan-300 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 border border-cyan-500/30 focus:outline-none focus:ring-2 focus:ring-cyan-400 cursor-pointer">
+                        <option value="sun">☀️ ดวงอาทิตย์ (Sun)</option>
+                        <option value="mercury">🪐 ดาวพุธ (Mercury)</option>
+                        <option value="venus">🪐 ดาวศุกร์ (Venus)</option>
+                        <option value="earth">🌍 โลก (Earth)</option>
+                        <option value="mars">🔴 ดาวอังคาร (Mars)</option>
+                        <option value="asteroid_belt">☄️ แถบดาวเคราะห์น้อย (Asteroid Belt)</option>
+                        <option value="jupiter">🪐 ดาวพฤหัสบดี (Jupiter)</option>
+                        <option value="saturn">🪐 ดาวเสาร์ (Saturn)</option>
+                        <option value="uranus">🩵 ดาวยูเรนัส (Uranus)</option>
+                        <option value="neptune">💙 ดาวเนปจูน (Neptune)</option>
+                        <option value="kuiper_belt">❄️ แถบไคเปอร์ (Kuiper Belt)</option>
+                        <option value="oort_cloud">🌌 เมฆของออร์ต (Oort Cloud)</option>
+                    </select>
+                </div>
+
+                <!-- Audio Ambient Synthesizer Controls -->
+                <button id="btn-toggle-sound" onclick="toggleAudioEngine()" title="เปิด/ปิดเสียงบรรยากาศอวกาศและเอฟเฟค" class="px-3 py-2 rounded-xl bg-space-800/90 hover:bg-space-700 text-cyan-300 text-xs font-medium transition flex items-center space-x-2 border border-slate-700">
+                    <i id="icon-sound" class="fa-solid fa-volume-high text-cyan-400"></i>
+                    <div id="sound-waves" class="flex items-center space-x-0.5 h-4">
+                        <span class="w-0.5 bg-cyan-400 animate-wave-1"></span>
+                        <span class="w-0.5 bg-cyan-400 animate-wave-2"></span>
+                        <span class="w-0.5 bg-cyan-400 animate-wave-3"></span>
+                    </div>
+                </button>
+
+                <!-- Quiz Button -->
+                <button onclick="openQuizModal()" class="px-3 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs sm:text-sm font-medium transition shadow-md flex items-center space-x-1.5">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                    <span class="hidden sm:inline">แบบทดสอบ</span>
+                </button>
+
+                <!-- Reset Camera Button -->
+                <button onclick="resetCamera()" title="มุมมองเริ่มต้น" class="p-2 w-9 h-9 rounded-xl bg-space-800/80 hover:bg-space-700 text-cyan-300 transition flex items-center justify-center border border-slate-700">
+                    <i class="fa-solid fa-compress text-sm"></i>
                 </button>
             </div>
 
         </div>
+    </header>
+
+    <!-- Bottom Simulation Controls Bar -->
+    <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto w-full max-w-2xl px-4">
+        <div class="glass-panel px-4 py-2.5 rounded-3xl shadow-2xl flex items-center justify-between space-x-3 border border-cyan-500/20 backdrop-blur-md">
+            
+            <!-- Play/Pause -->
+            <button id="btn-toggle-orbit" onclick="toggleOrbitAnimation()" title="หยุด/เล่นการหมุนวงโคจร" class="w-9 h-9 rounded-full bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 flex items-center justify-center transition flex-shrink-0">
+                <i id="icon-toggle-orbit" class="fa-solid fa-pause"></i>
+            </button>
+
+            <!-- Speed Slider -->
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-gauge-high text-xs text-slate-400" title="ความเร็วการหมุน"></i>
+                <input type="range" id="slider-speed" min="0" max="4" step="0.2" value="1" oninput="updateOrbitSpeed(this.value)" class="w-16 sm:w-24 accent-cyan-400 cursor-pointer">
+                <span id="speed-label" class="text-[11px] font-mono text-cyan-400 w-7">1.0x</span>
+            </div>
+
+            <div class="h-5 w-px bg-slate-700/60 hidden sm:block"></div>
+
+            <!-- Toggles Group -->
+            <div class="flex items-center space-x-1.5">
+                <button id="btn-toggle-scale" onclick="toggleScaleMode()" title="สลับระหว่างสเกลสื่อการสอนและสเกลระยะจริง" class="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition flex items-center space-x-1">
+                    <i class="fa-solid fa-ruler-combined"></i>
+                    <span id="scale-mode-label" class="hidden md:inline">สเกลการสอน</span>
+                </button>
+
+                <button id="btn-toggle-lines" onclick="toggleOrbitLines()" class="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 transition flex items-center space-x-1">
+                    <i class="fa-solid fa-circle-notch"></i>
+                    <span class="hidden md:inline">เส้นวิถี</span>
+                </button>
+
+                <button id="btn-toggle-labels" onclick="toggleLabels()" class="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 transition flex items-center space-x-1">
+                    <i class="fa-solid fa-tag"></i>
+                    <span class="hidden md:inline">ป้ายชื่อ</span>
+                </button>
+            </div>
+        </div>
     </div>
 
-    <!-- MAIN JAVASCRIPT ENGINE -->
+    <!-- Celestial Detail Modal / Side Panel -->
+    <div id="detail-modal" class="fixed inset-y-0 right-0 w-full max-w-2xl z-30 glass-panel shadow-2xl transform translate-x-full transition-transform duration-500 ease-in-out flex flex-col border-l border-cyan-500/30 pointer-events-auto">
+        
+        <!-- Modal Header -->
+        <div class="p-4 sm:p-5 border-b border-slate-700/60 flex items-center justify-between bg-space-950/70">
+            <div class="flex items-center space-x-3">
+                <span id="modal-icon" class="text-3xl">☀️</span>
+                <div>
+                    <h2 id="modal-title" class="text-xl sm:text-2xl font-bold bg-gradient-to-r from-cyan-300 via-white to-amber-300 bg-clip-text text-transparent">ดวงอาทิตย์</h2>
+                    <p id="modal-subtitle" class="text-xs text-cyan-400 font-medium">ดาวฤกษ์ศูนย์กลางระบบสุริยะ</p>
+                </div>
+            </div>
+            <button onclick="closeDetailModal()" class="w-9 h-9 rounded-xl bg-space-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-300 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Navigation Tabs inside Modal -->
+        <div class="flex border-b border-slate-800 bg-space-900/50 px-4">
+            <button id="tab-btn-overview" onclick="switchTab('overview')" class="py-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold text-cyan-400 border-b-2 border-cyan-400 transition flex items-center space-x-2">
+                <i class="fa-solid fa-book-open"></i>
+                <span>รายละเอียด & จุดเด่น</span>
+            </button>
+            <button id="tab-btn-data" onclick="switchTab('data')" class="py-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent transition flex items-center space-x-2">
+                <i class="fa-solid fa-chart-simple"></i>
+                <span>ข้อมูลดาราศาสตร์</span>
+            </button>
+            <button id="tab-btn-video" onclick="switchTab('video')" class="py-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent transition flex items-center space-x-2">
+                <i class="fa-solid fa-video text-red-400"></i>
+                <span>วิดีโอ & ซับไทย</span>
+            </button>
+        </div>
+
+        <!-- Modal Body Content Scrollable Area -->
+        <div class="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6">
+            
+            <!-- TAB 1: OVERVIEW -->
+            <div id="tab-content-overview" class="space-y-6">
+                <div>
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-3 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-star text-amber-400"></i>
+                        <span>ลักษณะสำคัญทางดาราศาสตร์ (Key Features)</span>
+                    </h3>
+                    <div id="modal-highlights-container" class="grid grid-cols-1 gap-3">
+                        <!-- Dynamic Feature Cards -->
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-align-left text-cyan-400"></i>
+                        <span>บทเรียนเชิงลึก</span>
+                    </h3>
+                    <div id="modal-description" class="text-slate-300 text-xs sm:text-sm leading-relaxed space-y-3 font-light bg-space-900/60 p-4 rounded-2xl border border-slate-800/80">
+                        <!-- Dynamic Text -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: ASTRONOMICAL DATA -->
+            <div id="tab-content-data" class="hidden space-y-4">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-2">ข้อมูลทางกายภาพและวงโคจร</h3>
+                <div id="modal-stats-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Dynamic Stat Cards -->
+                </div>
+            </div>
+
+            <!-- TAB 3: VIDEO & SUBTITLES -->
+            <div id="tab-content-video" class="hidden space-y-5">
+                
+                <!-- 16:9 Video Container -->
+                <div class="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/30 bg-black">
+                    <iframe id="video-iframe" class="w-full h-full" src="" title="Solar System Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe>
+                </div>
+
+                <!-- Fallback YouTube Direct Link Button -->
+                <div class="flex justify-end">
+                    <a id="youtube-direct-link" href="#" target="_blank" rel="noopener noreferrer" class="text-xs text-cyan-400 hover:text-cyan-300 underline flex items-center space-x-1 bg-space-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                        <i class="fa-brands fa-youtube text-red-500"></i>
+                        <span>หากวิดีโอไม่เล่น คลิกเปิดดูบน YouTube โดยตรง</span>
+                    </a>
+                </div>
+
+                <!-- Interactive Subtitles / Script Player -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-xs font-semibold uppercase tracking-wider text-cyan-400 flex items-center space-x-2">
+                            <i class="fa-solid fa-closed-captioning text-red-400"></i>
+                            <span>คำบรรยายบทเรียน (English Audio + ซับไทย)</span>
+                        </h4>
+                    </div>
+
+                    <div id="script-container" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        <!-- Dynamic Subtitle Lines -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-4 border-t border-slate-800 bg-space-950/80 flex items-center justify-between">
+            <span class="text-xs text-slate-500">วิชาโลก ดาราศาสตร์ และอวกาศ สพฐ.</span>
+            <button onclick="closeDetailModal()" class="px-4 py-2 bg-space-800 hover:bg-space-700 text-cyan-300 text-xs font-semibold rounded-xl transition">
+                ปิดหน้าต่าง
+            </button>
+        </div>
+    </div>
+
+    <!-- Quiz Modal -->
+    <div id="quiz-modal" class="fixed inset-0 z-40 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-xl rounded-3xl p-6 border border-cyan-500/30 shadow-2xl relative space-y-6">
+            <button onclick="closeQuizModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-space-800 text-slate-300 flex items-center justify-center hover:bg-rose-900/60">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-white">ทดสอบความรู้ระบบสุริยะ</h3>
+                    <p class="text-xs text-slate-400">แบบทดสอบประเมินความเข้าใจดาราศาสตร์</p>
+                </div>
+            </div>
+
+            <!-- Quiz Card Container -->
+            <div id="quiz-content-area" class="space-y-4">
+                <!-- Dynamic Quiz Content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT CODE -->
     <script>
-<!-- ... existing code ... -->
         /* ==========================================================================
-           8. CUSTOM TEXTURE UPLOADER & MANAGER LOGIC WITH BASE64 & PRESET STYLES
+           1. WEB AUDIO API SYNTHESIZER (Cosmic Ambient Drone & SFX)
            ========================================================================== */
-        let originalTextures = {};
-        let customTextureURLs = {};
+        let audioCtx = null;
+        let ambientOsc1 = null, ambientOsc2 = null, ambientGain = null;
+        let isAudioMuted = false;
+        let audioInitialized = false;
 
-        // PRESET TEXTURE GENERATORS
-        function applyProceduralStyle(styleName, planetIdFilter = null) {
-            const targets = planetIdFilter ? [planetIdFilter] : Object.keys(CELESTIAL_DATA);
+        function initAudioEngine() {
+            if (audioInitialized) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
 
-            targets.forEach(key => {
-                if (key === 'asteroid_belt' || key === 'kuiper_belt' || key === 'oort_cloud') return;
-                const mesh = celestialMeshes[key];
-                if (!mesh || !mesh.material) return;
+                // Create Cosmic Ambient Synth (Detuned Low Drone)
+                ambientGain = audioCtx.createGain();
+                ambientGain.gain.setValueAtTime(0.12, audioCtx.currentTime);
 
-                if (!originalTextures[key]) {
-                    originalTextures[key] = mesh.material.map;
-                }
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(180, audioCtx.currentTime);
 
-                const newTex = generatePresetTexture(key, styleName);
-                if (newTex) {
-                    if (THREE.sRGBEncoding) newTex.encoding = THREE.sRGBEncoding;
-                    if (THREE.SRGBColorSpace) newTex.colorSpace = THREE.SRGBColorSpace;
-                    newTex.needsUpdate = true;
-                    mesh.material.map = newTex;
-                    mesh.material.needsUpdate = true;
-                    delete customTextureURLs[key];
-                }
-            });
+                ambientOsc1 = audioCtx.createOscillator();
+                ambientOsc1.type = 'sine';
+                ambientOsc1.frequency.setValueAtTime(55, audioCtx.currentTime); // A1 note
 
-            updateTextureModalPreview();
-            SoundFX.playCorrect();
-            const styleNamesTh = {
-                natural: 'ภาพจริงเสมือน (Natural)',
-                topo: 'แผนที่ภูมิประเทศ (Topo)',
-                infrared: 'อินฟราเรดถ่ายความร้อน (Infrared)',
-                vintage: 'แผนที่วินเทจโบราณ (Vintage Atlas)'
-            };
-            showToast(`ปรับสไตล์พื้นผิวเป็น "${styleNamesTh[styleName] || styleName}" สำเร็จ!`, 'success');
+                ambientOsc2 = audioCtx.createOscillator();
+                ambientOsc2.type = 'triangle';
+                ambientOsc2.frequency.setValueAtTime(110.5, audioCtx.currentTime); // A2 slight detune
+
+                ambientOsc1.connect(filter);
+                ambientOsc2.connect(filter);
+                filter.connect(ambientGain);
+                ambientGain.connect(audioCtx.destination);
+
+                ambientOsc1.start();
+                ambientOsc2.start();
+                audioInitialized = true;
+            } catch(e) {
+                console.log("Web Audio API error:", e);
+            }
         }
 
-        function generatePresetTexture(key, style) {
-            if (style === 'natural') {
-                return createDefaultTexture(key);
+        function playClickSFX() {
+            if (!audioCtx || isAudioMuted) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.05);
+            } catch(e){}
+        }
+
+        function playWarpSFX() {
+            if (!audioCtx || isAudioMuted) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.35);
+            } catch(e){}
+        }
+
+        function playChimeSFX() {
+            if (!audioCtx || isAudioMuted) return;
+            try {
+                const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+                notes.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.06);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime + idx * 0.06);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.06 + 0.25);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(audioCtx.currentTime + idx * 0.06);
+                    osc.stop(audioCtx.currentTime + idx * 0.06 + 0.25);
+                });
+            } catch(e){}
+        }
+
+        function toggleAudioEngine() {
+            initAudioEngine();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
             }
-            
-            const canvas = document.createElement('canvas');
-            canvas.width = 1024; canvas.height = 512;
-            const ctx = canvas.getContext('2d');
+            isAudioMuted = !isAudioMuted;
+            if (ambientGain) {
+                ambientGain.gain.setValueAtTime(isAudioMuted ? 0 : 0.12, audioCtx.currentTime);
+            }
+            const icon = document.getElementById('icon-sound');
+            const waves = document.getElementById('sound-waves');
+            if (isAudioMuted) {
+                icon.className = 'fa-solid fa-volume-xmark text-rose-400';
+                waves.classList.add('hidden');
+            } else {
+                icon.className = 'fa-solid fa-volume-high text-cyan-400';
+                waves.classList.remove('hidden');
+                playClickSFX();
+            }
+        }
 
-            if (style === 'topo') {
-                const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-                grad.addColorStop(0, '#0f172a'); grad.addColorStop(0.25, '#0284c7');
-                grad.addColorStop(0.5, '#10b981'); grad.addColorStop(0.75, '#eab308');
-                grad.addColorStop(1, '#ef4444');
-                ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        /* ==========================================================================
+           2. CELESTIAL BODIES DATA & WORKING YOUTUBE EMBEDS
+           ========================================================================== */
+        const solarSystemData = {
+            sun: {
+                name: "ดวงอาทิตย์ (Sun)",
+                subtitle: "ดาวฤกษ์ศูนย์กลางของระบบสุริยะ (G-type Main-Sequence Star)",
+                icon: "☀️",
+                type: "star",
+                highlights: [
+                    { title: "จุดมืดดวงอาทิตย์ (Sunspots)", desc: "บริเวณบนชั้นโฟโตสเฟียร์ที่มีอุณหภูมิต่ำกว่าบริเวณโดยรอบ เกิดจากสนามแม่เหล็กเข้มข้นยับยั้งการพาความร้อน", icon: "fa-circle-dot", color: "text-amber-400" },
+                    { title: "เปลวสุริยะ (Solar Prominences)", desc: "ห่วงพลาสมาร้อนจัดขนาดยักษ์ที่พุ่งพวยขึ้นมาจากพื้นผิวดวงอาทิตย์ตามเส้นแรงแม่เหล็ก", icon: "fa-fire-flame-curved", color: "text-orange-400" },
+                    { title: "ลมสุริยะ (Solar Wind)", desc: "กระแสอนุภาคประจุไฟฟ้าที่ปลดปล่อยจากดวงอาทิตย์สู่ทั่วระบบสุริยะ ก่อให้เกิดแสงเหนือแสงใต้ (Aurora)", icon: "fa-wind", color: "text-yellow-300" }
+                ],
+                description: `
+                    <p><b>ดวงอาทิตย์</b> เป็นดาวฤกษ์ ณ ศูนย์กลางของระบบสุริยะ มีมวลคิดเป็น 99.86% ของมวลทั้งหมด เกิดปฏิกิริยานิวเคลียร์ฟิวชัน (Nuclear Fusion) เปลี่ยนไฮโดรเจนเป็นฮีเลียมที่แกนกลาง หล่อเลี้ยงพลังงานและความร้อนให้แก่ดาวเคราะห์บริวาร</p>
+                    <p><b>จุดมืดดวงอาทิตย์ (Sunspots)</b> เป็นปรากฏการณ์สำคัญที่เปลี่ยนแปลงตามวัฏจักรดวงอาทิตย์ (Solar Cycle) ทุกๆ 11 ปี โดยจุดมืดมักเป็นจุดกำเนิดของการลุกจ้อง (Solar Flare) และการปลดปล่อยก้อนมวลสารจากคอโรนา (CME)</p>
+                `,
+                stats: {
+                    diameter: "1,392,700 กม. (109 เท่าของโลก)",
+                    mass: "1.989 × 10³⁰ กก. (333,000 เท่าของโลก)",
+                    distance: "0 AU (ศูนย์กลาง)",
+                    temp: "5,500 °C (พื้นผิว) / 15 ล้าน °C (แกนกลาง)",
+                    satellites: "ดาวเคราะห์ 8 ดวง + ดาวเคราะห์แคระ",
+                    rotation: "25 - 35 วัน (แตกต่างตามละติจูด)",
+                    orbit: "230 ล้านปี (โคจรรอบแกนแกแล็กซี)"
+                },
+                youtubeId: "2Ho86Ejgjio",
+                script: [
+                    { time: "00:05", en: "The Sun is a yellow dwarf star, a hot ball of glowing gases at the heart of our solar system.", th: "ดวงอาทิตย์เป็นดาวฤกษ์แคระเหลือง ซึ่งเป็นทรงกลมของแก๊สร้อนสว่างไสว ณ ศูนย์กลางของระบบสุริยะ" },
+                    { time: "00:15", en: "Its gravity holds the solar system together, keeping everything in orbit.", th: "แรงโน้มถ่วงของดวงอาทิตย์ยึดเหนี่ยวระบบสุริยะไว้ ให้ทุกสิ่งโคจรรอบตัวมัน" },
+                    { time: "00:25", en: "Sunspots are cooler regions caused by strong magnetic fields on the solar surface.", th: "จุดมืดดวงอาทิตย์คือบริเวณที่เย็นกว่า เกิดจากสนามแม่เหล็กเข้มข้นบนพื้นผิวดวงอาทิตย์" }
+                ]
+            },
+            mercury: {
+                name: "ดาวพุธ (Mercury)",
+                subtitle: "ดาวเคราะห์หินขนาดเล็กที่สุดและใกล้ดวงอาทิตย์ที่สุด",
+                icon: "🪐",
+                type: "rocky",
+                highlights: [
+                    { title: "แอ่งแคลอริส (Caloris Basin)", desc: "แอ่งอุกกาบาตขนาดใหญ่ยักษ์ เส้นผ่านศูนย์กลางกว่า 1,550 กม. เกิดจากการชนของดาวเคราะห์น้อยในยุคเริ่มต้น", icon: "fa-bullseye", color: "text-slate-400" },
+                    { title: "อุณหภูมิสุดขั้ว", desc: "กลางวันร้อนจัดถึง 430°C แต่กลางคืนหนาวจัดถึง -180°C เนื่องจากไม่มีชั้นบรรยากาศช่วยเก็บความร้อน", icon: "fa-temperature-high", color: "text-rose-400" }
+                ],
+                description: `
+                    <p><b>ดาวพุธ</b> เป็นดาวเคราะห์หินที่มีขนาดเล็กที่สุดในระบบสุริยะ มีลักษณะพื้นผิวขรุขระเต็มไปด้วยแอ่งอุกกาบาตคล้ายดวงจันทร์ของโลก ดาวพุธไม่มีชั้นบรรยากาศหนาแน่น มีเพียงชั้นแก๊สบางเบา (Exosphere)</p>
+                `,
+                stats: {
+                    diameter: "4,879 กม. (0.38 เท่าของโลก)",
+                    mass: "3.30 × 10²³ กก.",
+                    distance: "0.39 AU (57.9 ล้าน กม.)",
+                    temp: "-180 °C ถึง 430 °C",
+                    satellites: "0 ดวง",
+                    rotation: "58.6 วันโลก",
+                    orbit: "88 วันโลก"
+                },
+                youtubeId: "0KBjnNuhRHs",
+                script: [
+                    { time: "00:04", en: "Mercury is the smallest planet in our solar system and closest to the Sun.", th: "ดาวพุธเป็นดาวเคราะห์ที่เล็กที่สุดในระบบสุริยะและอยู่ใกล้ดวงอาทิตย์มากที่สุด" },
+                    { time: "00:14", en: "It has a heavily cratered surface, similar to Earth's Moon.", th: "มีพื้นผิวเต็มไปด้วยแอ่งอุกกาบาตจำนวนมาก คล้ายกับดวงจันทร์ของโลก" }
+                ]
+            },
+            venus: {
+                name: "ดาวศุกร์ (Venus)",
+                subtitle: "ฝาแฝดผู้โหดร้ายของโลก & ดาวเคราะห์ที่ร้อนที่สุด",
+                icon: "🪐",
+                type: "rocky",
+                highlights: [
+                    { title: "สภาวะเรือนกระจกสุดขั้ว", desc: "บรรยากาศหนาแน่นด้วย CO2 กว่า 96% เกิดปรากฏการณ์เรือนกระจกจนร้อนที่สุดในระบบสุริยะ (462°C)", icon: "fa-fire", color: "text-orange-500" },
+                    { title: "การหมุนกลับทิศ (Retrograde)", desc: "ดาวศุกร์หมุนรอบตัวเองจากทิศตะวันออกไปทิศตะวันตก สวนทางกับดาวเคราะห์ดวงอื่น", icon: "fa-rotate-left", color: "text-amber-300" }
+                ],
+                description: `
+                    <p><b>ดาวศุกร์</b> ถูกเรียกว่า "ดาวฝาแฝดของโลก" เนื่องจากมีขนาด มวล และความหนาแน่นใกล้เคียงกับโลก แต่บรรยากาศกลับเต็มไปด้วยกรดซัลฟิวริกและก๊าซคาร์บอนไดออกไซด์มหาศาล กดทับด้วยความดันบรรยากาศสูงกว่าโลกถึง 92 เท่า</p>
+                `,
+                stats: {
+                    diameter: "12,104 กม. (0.95 เท่าของโลก)",
+                    mass: "4.87 × 10²⁴ กก.",
+                    distance: "0.72 AU (108.2 ล้าน กม.)",
+                    temp: "462 °C (ร้อนสม่ำเสมอทั่วดวง)",
+                    satellites: "0 ดวง",
+                    rotation: "243 วันโลก (หมุนย้อนทิศ)",
+                    orbit: "225 วันโลก"
+                },
+                youtubeId: "Bvr3V5OUec8",
+                script: [
+                    { time: "00:05", en: "Venus is the hottest planet in our solar system because of its thick atmosphere.", th: "ดาวศุกร์เป็นดาวเคราะห์ที่ร้อนที่สุดในระบบสุริยะเนื่องจากชั้นบรรยากาศที่หนาแน่น" }
+                ]
+            },
+            earth: {
+                name: "โลก (Earth)",
+                subtitle: "บ้านแห่งชีวิต & สิ่งมีชีวิตเดียวที่รู้จักในอวกาศ",
+                icon: "🌍",
+                type: "rocky",
+                highlights: [
+                    { title: "น้ำในสถานะของเหลว", desc: "ปกคลุมพื้นผิวกว่า 71% มีบรรยากาศ N2-O2 และสนามแม่เหล็กปกป้องรังสีจากอวกาศ", icon: "fa-droplet", color: "text-blue-400" },
+                    { title: "ดวงจันทร์ (The Moon)", desc: "บริวารดวงเดียวที่ช่วยสร้างเสถียรภาพแกนเอียง 23.5 องศา ก่อให้เกิดฤดูกาลที่เหมาะสม", icon: "fa-moon", color: "text-slate-300" }
+                ],
+                description: `
+                    <p><b>โลก</b> เป็นดาวเคราะห์หินดวงใหญ่ที่สุดในกลุ่มดาวเคราะห์ชั้นใน มีสนามแม่เหล็กเข้มข้นปกป้องบรรยากาศจากรังสีสุริยะ มีแผ่นเปลือกโลก (Plate Tectonics) ที่ช่วยหมุนเวียนคาร์บอนและสารอาหาร</p>
+                `,
+                stats: {
+                    diameter: "12,742 กม.",
+                    mass: "5.97 × 10²⁴ กก.",
+                    distance: "1.00 AU (149.6 ล้าน กม.)",
+                    temp: "-88 °C ถึง 58 °C (เฉลี่ย 15 °C)",
+                    satellites: "1 ดวง (ดวงจันทร์)",
+                    rotation: "23 ชั่วโมง 56 นาที",
+                    orbit: "365.25 วัน"
+                },
+                youtubeId: "HCDVN7DCzYE",
+                script: [
+                    { time: "00:05", en: "Earth is our home, the third planet from the Sun and the only world known to harbor life.", th: "โลกคือบ้านของเรา ดาวเคราะห์ลำดับที่สามจากดวงอาทิตย์ และเป็นโลกใบเดียวที่พบสิ่งมีชีวิต" }
+                ]
+            },
+            mars: {
+                name: "ดาวอังคาร (Mars)",
+                subtitle: "ดาวเคราะห์แดง & ภูเขาที่สูงที่สุดในระบบสุริยะ",
+                icon: "🔴",
+                type: "rocky",
+                highlights: [
+                    { title: "ภูเขาไฟโอลิมปัส (Olympus Mons)", desc: "ภูเขาไฟที่สูงที่สุดในระบบสุริยะ! สูงถึง 21.9 กิโลเมตร (สูงกว่ายอดเขาเอเวอเรสต์เกือบ 3 เท่า)", icon: "fa-mountain", color: "text-rose-400" },
+                    { title: "หุบเขาลึก วาลเลส มาริเนริส", desc: "ระบบร่องหุบเขายักษ์ยาวกว่า 4,000 กม. ลึก 7 กม. กว้างขวางที่สุดในระบบสุริยะ", icon: "fa-water", color: "text-amber-500" }
+                ],
+                description: `
+                    <p><b>ดาวอังคาร</b> ได้ชื่อว่า "ดาวเคราะห์แดง" จากเหล็กออกไซด์ (สนิมเหล็ก) บนพื้นผิว ในอดีตเคยมีน้ำไหลบนพื้นผิวและมีบรรยากาศหนาแน่นกว่าปัจจุบัน จึงเป็นเป้าหมายหลักในการค้นหาร่องรอยสิ่งมีชีวิต</p>
+                `,
+                stats: {
+                    diameter: "6,779 กม. (0.53 เท่าของโลก)",
+                    mass: "6.42 × 10²³ กก.",
+                    distance: "1.52 AU (227.9 ล้าน กม.)",
+                    temp: "-125 °C ถึง 20 °C (เฉลี่ย -60 °C)",
+                    satellites: "2 ดวง (โฟบอส และ ไดมอส)",
+                    rotation: "24 ชั่วโมง 37 นาที",
+                    orbit: "687 วันโลก"
+                },
+                youtubeId: "D8pnmwOXhoY",
+                script: [
+                    { time: "00:06", en: "Mars is a dusty, cold, desert world with a very thin atmosphere.", th: "ดาวอังคารเป็นโลกทะเลทรายที่เต็มไปด้วยฝุ่นและหนาวเย็น" }
+                ]
+            },
+            asteroid_belt: {
+                name: "แถบดาวเคราะห์น้อย (Asteroid Belt)",
+                subtitle: "วงแหวนหินและโลหะโบราณระหว่างดาวอังคารและดาวพฤหัสบดี",
+                icon: "☄️",
+                type: "belts",
+                highlights: [
+                    { title: "ดาวเคราะห์แคระซีรีส (Ceres)", desc: "วัตถุที่ใหญ่ที่สุดในแถบดาวเคราะห์น้อย เส้นผ่านศูนย์กลาง ~940 กม.", icon: "fa-circle", color: "text-slate-300" },
+                    { title: "เศษซากการก่อตัว", desc: "หินนับล้านก้อนที่ไม่สามารถรวมตัวเป็นดาวเคราะห์ได้เนื่องจากแรงรบกวนทางโน้มถ่วงจากดาวพฤหัสบดี", icon: "fa-cubes", color: "text-amber-400" }
+                ],
+                description: `
+                    <p><b>แถบดาวเคราะห์น้อย</b> เป็นบริเวณในระบบสุริยะที่อยู่ระหว่างวงโคจรของดาวอังคารกับดาวพฤหัสบดี ประกอบด้วยวัตถุหินและโลหะขนาดต่างๆ ตั้งแต่ขนาดก้อนหินเล็กๆ ไปจนถึงดาวเคราะห์แคระซีรีส</p>
+                `,
+                stats: {
+                    diameter: "กว้างประมาณ 1 AU (150 ล้าน กม.)",
+                    mass: "ประมาณ 4% ของมวลลอร์ดดวงจันทร์",
+                    distance: "2.2 ถึง 3.2 AU จากดวงอาทิตย์",
+                    temp: "-73 °C ถึง -108 °C",
+                    satellites: "ดาวเคราะห์น้อยบางดวงมีดวงจันทร์เล็กๆ",
+                    rotation: "แตกต่างกันไปในแต่ละก้อน",
+                    orbit: "3 ถึง 6 ปีโลก"
+                },
+                youtubeId: "auxp8nn025w",
+                script: [
+                    { time: "00:05", en: "The Asteroid Belt is a region between Mars and Jupiter filled with rocky remnants.", th: "แถบดาวเคราะห์น้อยเป็นบริเวณระหว่างดาวอังคารและดาวพฤหัสบดีที่เต็มไปด้วยเศษซากหิน" }
+                ]
+            },
+            jupiter: {
+                name: "ดาวพฤหัสบดี (Jupiter)",
+                subtitle: "พี่ใหญ่ยักษ์แก๊ส & พายุหมุนยักษ์จุดแดงใหญ่",
+                icon: "🪐",
+                type: "gas",
+                highlights: [
+                    { title: "จุดแดงใหญ่ (Great Red Spot)", desc: "พายุหมุนต้านไซโคลนขนาดยักษ์ที่พัดต่อเนื่องมานานหลายร้อยปี มีขนาดกว้างกว่าโลก!", icon: "fa-eye", color: "text-rose-500" },
+                    { title: "ดาวบริวารกาลิเลียน", desc: "ดวงจันทร์ใหญ่ 4 ดวง: ไอโอ (ภูเขาไฟ), ยูโรปา (มหาสมุทรใต้น้ำแข็ง), แกนีมีด (ดวงจันทร์ใหญ่สุด), คัลลิสโต", icon: "fa-circle-nodes", color: "text-cyan-300" }
+                ],
+                description: `
+                    <p><b>ดาวพฤหัสบดี</b> เป็นดาวเคราะห์ที่มีขนาดใหญ่ที่สุดในระบบสุริยะ มีมวลมากกว่าดาวเคราะห์อื่นรวมกันถึง 2.5 เท่า ประกอบด้วยไฮโดรเจนและฮีเลียมเป็นหลัก ไม่มีพื้นผิวแข็ง</p>
+                `,
+                stats: {
+                    diameter: "139,820 กม. (11 เท่าของโลก)",
+                    mass: "1.898 × 10²⁷ กก. (318 เท่าของโลก)",
+                    distance: "5.20 AU (778.5 ล้าน กม.)",
+                    temp: "-110 °C (ชั้นเมฆ)",
+                    satellites: "95 ดวง (ค้นพบแล้ว)",
+                    rotation: "9 ชั่วโมง 55 นาที (หมุนเร็วที่สุด)",
+                    orbit: "11.86 ปีโลก"
+                },
+                youtubeId: "P5_MrBKz59A",
+                script: [
+                    { time: "00:05", en: "Jupiter is the giant of our solar system, more than twice as massive as all other planets combined.", th: "ดาวพฤหัสบดีคือยักษ์ใหญ่แห่งระบบสุริยะ มีมวลมากกว่าดาวเคราะห์ดวงอื่นรวมกันกว่าสองเท่า" }
+                ]
+            },
+            saturn: {
+                name: "ดาวเสาร์ (Saturn)",
+                subtitle: "อัญมณีแห่งระบบสุริยะ & ระบบวงแหวนอันงดงาม",
+                icon: "🪐",
+                type: "gas",
+                highlights: [
+                    { title: "ระบบวงแหวน & ช่องว่างแคสสินี", desc: "อนุภาคน้ำแข็งและหินขนาดยักษ์ มีช่องว่างแคสสินี (Cassini Division) กว้างกว่า 4,800 กม.", icon: "fa-ring", color: "text-amber-300" },
+                    { title: "ดาวบริวารไททัน (Titan)", desc: "ดวงจันทร์ดวงเดียวที่มีชั้นบรรยากาศหนาแน่น และมีทะเลมีเทนเหลวบนพื้นผิว", icon: "fa-globe", color: "text-orange-400" }
+                ],
+                description: `
+                    <p><b>ดาวเสาร์</b> เป็นดาวเคราะห์แก๊สยักษ์ดวงที่สอง มีความหนาแน่นเฉลี่ยน้อยกว่าน้ำ ระบบวงแหวนของดาวเสาร์ขยายออกไปไกลหลายแสนกิโลเมตร แต่มีความบางอย่างน่าอัศจรรย์</p>
+                `,
+                stats: {
+                    diameter: "116,460 กม. (9.5 เท่าของโลก)",
+                    mass: "5.68 × 10²⁶ กก. (95 เท่าของโลก)",
+                    distance: "9.58 AU (1.43 พันล้าน กม.)",
+                    temp: "-140 °C",
+                    satellites: "146 ดวง",
+                    rotation: "10 ชั่วโมง 33 นาที",
+                    orbit: "29.45 ปีโลก"
+                },
+                youtubeId: "epZdZaEQhS0",
+                script: [
+                    { time: "00:05", en: "Adorned with thousands of beautiful ringlets, Saturn is unique among the planets.", th: "ประดับประดาด้วยวงแหวนสวยงามนับพัน ดาวเสาร์มีความโดดเด่นไม่เหมือนใคร" }
+                ]
+            },
+            uranus: {
+                name: "ดาวยูเรนัส (Uranus)",
+                subtitle: "ยักษ์น้ำแข็งผู้เอียงข้าง (Ice Giant)",
+                icon: "🩵",
+                type: "gas",
+                highlights: [
+                    { title: "แกนเอียงสุดขั้ว 97.8 องศา", desc: "หมุนตะแคงข้างเกือบขนานกับระนาบวงโคจร ทำให้เกิดฤดูกาลยาวนานขั้วละ 42 ปี", icon: "fa-arrows-rotate", color: "text-cyan-400" },
+                    { title: "บรรยากาศมีเทนสีฟ้าอมเขียว", desc: "แก๊สมีเทนในบรรยากาศดูดกลืนแสงสีแดงและสะท้อนแสงสีฟ้าเขียวออกมา", icon: "fa-wind", color: "text-teal-300" }
+                ],
+                description: `
+                    <p><b>ดาวยูเรนัส</b> เป็นดาวเคราะห์ยักษ์น้ำแข็ง (Ice Giant) มีองค์ประกอบส่วนใหญ่เป็นน้ำ มีเทน และแอมโมเนียในสถานะความดันสูง</p>
+                `,
+                stats: {
+                    diameter: "50,724 กม. (4 เท่าของโลก)",
+                    mass: "8.68 × 10²⁵ กก.",
+                    distance: "19.22 AU (2.87 พันล้าน กม.)",
+                    temp: "-224 °C (เย็นที่สุด)",
+                    satellites: "28 ดวง",
+                    rotation: "17 ชั่วโมง 14 นาที",
+                    orbit: "84 ปีโลก"
+                },
+                youtubeId: "m4NXbFOiOGk",
+                script: [
+                    { time: "00:04", en: "Uranus is an ice giant planet that rotates at a nearly 90-degree angle from its orbit plane.", th: "ดาวยูเรนัสเป็นดาวเคราะห์ยักษ์น้ำแข็งที่หมุนเอียงทำมุมเกือบ 90 องศา" }
+                ]
+            },
+            neptune: {
+                name: "ดาวเนปจูน (Neptune)",
+                subtitle: "ดาวเคราะห์แดนไกล & ความเร็วลมสูงสุดในระบบสุริยะ",
+                icon: "💙",
+                type: "gas",
+                highlights: [
+                    { title: "พายุลมแรงที่สุด", desc: "กระแสลมพายุความเร็วสูงถึง 2,100 กม./ชม. ซึ่งเร็วที่สุดในบรรดาดาวเคราะห์", icon: "fa-bolt", color: "text-blue-400" },
+                    { title: "จุดมืดใหญ่ (Great Dark Spot)", desc: "พายุหมุนขนาดยักษ์ในซีกใต้ คล้ายจุดแดงใหญ่ของดาวพฤหัสบดี", icon: "fa-circle-notch", color: "text-indigo-400" }
+                ],
+                description: `
+                    <p><b>ดาวเนปจูน</b> เป็นดาวเคราะห์ลำดับสุดท้ายในระบบสุริยะ มีสีน้ำเงินเข้มจัดจากมีเทน มีดวงจันทร์ไทรทัน (Triton) โคจรรอบดวง</p>
+                `,
+                stats: {
+                    diameter: "49,244 กม. (3.9 เท่าของโลก)",
+                    mass: "1.02 × 10²⁶ กก.",
+                    distance: "30.05 AU (4.5 พันล้าน กม.)",
+                    temp: "-218 °C",
+                    satellites: "16 ดวง",
+                    rotation: "16 ชั่วโมง 6 นาที",
+                    orbit: "164.8 ปีโลก"
+                },
+                youtubeId: "NStn7zZKXfE",
+                script: [
+                    { time: "00:05", en: "Dark, cold, and whipped by supersonic winds, ice giant Neptune is the most distant major planet.", th: "มืด มิด หนาวจัด และถูกกระหน่ำด้วยลมเร็วเหนือเสียง ยักษ์น้ำแข็งเนปจูนคือดาวเคราะห์หลักที่ไกลที่สุด" }
+                ]
+            },
+            kuiper_belt: {
+                name: "แถบไคเปอร์ (Kuiper Belt)",
+                subtitle: "อาณาจักรน้ำแข็งและดาวเคราะห์แคระพ้นวงโคจรเนปจูน",
+                icon: "❄️",
+                type: "belts",
+                highlights: [
+                    { title: "ดาวพลูโต & ดาวเคราะห์แคระ", desc: "ถิ่นที่อยู่ของดาวพลูโต เอริส มาคีมาคี และเฮาเมอา วัตถุแช่แข็งยุคปฐมภูมิ", icon: "fa-snowflake", color: "text-cyan-200" }
+                ],
+                description: `
+                    <p><b>แถบไคเปอร์</b> เป็นบริเวณรูปจานขนาดยักษ์บริเวณขอบนอกของระบบสุริยะ เต็มไปด้วยวัตถุน้ำแข็ง (KBOs) เศษซากการก่อตัวของระบบสุริยะ</p>
+                `,
+                stats: {
+                    diameter: "กว้าง 20 AU (3 พันล้าน กม.)",
+                    mass: "ประมาณ 1/10 ของมวลโลก",
+                    distance: "30 ถึง 55 AU จากดวงอาทิตย์",
+                    temp: "-220 °C ถึง -240 °C",
+                    satellites: "ดาวเคราะห์แคระหลายดวง",
+                    rotation: "แตกต่างตามวัตถุ",
+                    orbit: "200 ถึง 500 ปีโลก"
+                },
+                youtubeId: "148j3lA0Vd4",
+                script: [
+                    { time: "00:05", en: "The Kuiper Belt is a donut-shaped ring of icy bodies beyond Neptune.", th: "แถบไคเปอร์เป็นวงแหวนรูปโดนัทของวัตถุน้ำแข็งที่อยู่เลยดาวเนปจูนออกไป" }
+                ]
+            },
+            oort_cloud: {
+                name: "เมฆของออร์ต (Oort Cloud)",
+                subtitle: "เกราะทรงกลมขอบนอกสุดของระบบสุริยะ",
+                icon: "🌌",
+                type: "belts",
+                highlights: [
+                    { title: "ขอบเขตอิทธิพลแรงโน้มถ่วงดวงอาทิตย์", desc: "โครงสร้างทรงกลมขนาดยักษ์ ห่อหุ้มระบบสุริยะไว้ทุกทิศทาง ขยายไกลถึงครึ่งทางไปดาวฤกษ์ถัดไป!", icon: "fa-globe-americas", color: "text-purple-300" }
+                ],
+                description: `
+                    <p><b>เมฆของออร์ต</b> คือขอบเขตสุดท้ายของระบบสุริยะ เป็นเรือนยอดทรงกลมที่ประกอบด้วยก้อนน้ำแข็งและดาวหางนับแสนล้านก้อน</p>
+                `,
+                stats: {
+                    diameter: "รัศมี 100,000 AU (~1.5 ปีแสง)",
+                    mass: "ประเมินไว้ 5 เท่าของมวลโลก",
+                    distance: "2,000 ถึง 100,000 AU",
+                    temp: "-268 °C",
+                    satellites: "นับแสนล้านก้อนดาวหาง",
+                    rotation: "ไม่มีทิศทางแน่นอน",
+                    orbit: "นับล้านปี"
+                },
+                youtubeId: "3mN2s4V7b0k",
+                script: [
+                    { time: "00:05", en: "The Oort Cloud is a predicted spherical shell of icy bodies surrounding the solar system.", th: "เมฆของออร์ตคือเกราะทรงกลมตามทฤษฎีของวัตถุน้ำแข็งที่ห่อหุ้มระบบสุริยะเอาไว้" }
+                ]
+            }
+        };
 
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-                ctx.lineWidth = 2;
-                for (let i = 0; i < 25; i++) {
+        /* ==========================================================================
+           3. HIGH-REALISM PROCEDURAL TEXTURE GENERATOR
+           ========================================================================== */
+        const TextureGen = {
+            createSunTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1024; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                
+                const grad = ctx.createLinearGradient(0, 0, 0, 512);
+                grad.addColorStop(0, '#ffe100');
+                grad.addColorStop(0.5, '#ff5500');
+                grad.addColorStop(1, '#cc1100');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 1024, 512);
+
+                // Granulation noise
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                for (let i = 0; i < 6000; i++) {
+                    ctx.fillRect(Math.random() * 1024, Math.random() * 512, Math.random() * 3 + 1, Math.random() * 3 + 1);
+                }
+                
+                // Detailed Sunspots (จุดมืดดวงอาทิตย์) with Penumbra
+                const spots = [[300, 200, 18], [320, 215, 10], [700, 310, 22], [730, 300, 14], [520, 160, 16]];
+                spots.forEach(([x, y, r]) => {
+                    // Penumbra (ขอบเงาสลัว)
+                    ctx.fillStyle = 'rgba(160, 50, 0, 0.7)';
+                    ctx.beginPath(); ctx.arc(x, y, r * 1.6, 0, Math.PI * 2); ctx.fill();
+                    // Umbra (แกนมืดสนิท)
+                    ctx.fillStyle = '#0a0200';
+                    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+                });
+
+                return new THREE.CanvasTexture(canvas);
+            },
+
+            createEarthTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1024; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                // Ocean Blue
+                ctx.fillStyle = '#0f3c5c';
+                ctx.fillRect(0, 0, 1024, 512);
+
+                // Continents (Green/Brown landmass approximation)
+                ctx.fillStyle = '#2d6a4f';
+                const drawContinent = (cx, cy, rx, ry) => {
                     ctx.beginPath();
-                    ctx.ellipse(Math.random() * canvas.width, Math.random() * canvas.height, 40 + Math.random() * 150, 20 + Math.random() * 80, Math.random(), 0, Math.PI * 2);
+                    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                };
+                drawContinent(250, 200, 90, 130); // Americas
+                drawContinent(320, 320, 70, 110);
+                drawContinent(600, 180, 140, 90); // Eurasia
+                drawContinent(620, 300, 100, 110); // Africa
+                drawContinent(850, 340, 70, 60); // Australia
+
+                // Polar Ice Caps
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, 1024, 30);
+                ctx.fillRect(0, 482, 1024, 30);
+
+                return new THREE.CanvasTexture(canvas);
+            },
+
+            createCloudTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1024; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = 'rgba(0,0,0,0)';
+                ctx.fillRect(0, 0, 1024, 512);
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+                for (let i = 0; i < 180; i++) {
+                    const x = Math.random() * 1024;
+                    const y = Math.random() * 400 + 56;
+                    const rx = Math.random() * 80 + 20;
+                    const ry = Math.random() * 25 + 10;
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, rx, ry, Math.random(), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                return new THREE.CanvasTexture(canvas);
+            },
+
+            createPlanetTexture(baseColor, stripeColor, numStripes = 0, spots = [], isMars = false) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1024; canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = baseColor;
+                ctx.fillRect(0, 0, 1024, 512);
+
+                if (numStripes > 0) {
+                    for (let i = 0; i < 512; i++) {
+                        const wave = Math.sin(i * 0.04) * 0.4 + Math.cos(i * 0.015) * 0.6;
+                        if (Math.sin(i * (numStripes / 40) + wave) > 0.05) {
+                            ctx.fillStyle = stripeColor;
+                            ctx.fillRect(0, i, 1024, 2 + Math.random() * 5);
+                        }
+                    }
+                }
+
+                // Mars Special Details (Polar caps & Olympus Mons)
+                if (isMars) {
+                    // Polar Caps
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, 1024, 25);
+                    ctx.fillRect(0, 487, 1024, 25);
+                    
+                    // Valles Marineris Canyon Line
+                    ctx.strokeStyle = '#4a1505';
+                    ctx.lineWidth = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(350, 280);
+                    ctx.lineTo(550, 290);
                     ctx.stroke();
                 }
-            } else if (style === 'infrared') {
-                const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-                grad.addColorStop(0, '#312e81'); grad.addColorStop(0.3, '#7e22ce');
-                grad.addColorStop(0.6, '#ec4899'); grad.addColorStop(0.8, '#f97316');
-                grad.addColorStop(1, '#facc15');
-                ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                for (let i = 0; i < 300; i++) {
-                    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(56, 189, 248, 0.6)' : 'rgba(255, 255, 255, 0.8)';
+                // Custom Spots (Great Red Spot / Olympus Mons circle)
+                spots.forEach(spot => {
+                    ctx.fillStyle = spot.color;
                     ctx.beginPath();
-                    ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 10, 0, Math.PI * 2);
+                    ctx.ellipse(spot.x, spot.y, spot.rx, spot.ry, 0, 0, Math.PI * 2);
                     ctx.fill();
+                    if(spot.border) {
+                        ctx.strokeStyle = spot.border;
+                        ctx.lineWidth = 5;
+                        ctx.stroke();
+                    }
+                });
+
+                // Fine Surface Noise
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+                for (let i = 0; i < 4000; i++) {
+                    ctx.fillRect(Math.random() * 1024, Math.random() * 512, 2, 2);
                 }
-            } else if (style === 'vintage') {
-                ctx.fillStyle = '#fef3c7'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#78350f';
-                for (let i = 0; i < 40; i++) {
-                    ctx.beginPath();
-                    ctx.ellipse(Math.random() * canvas.width, Math.random() * canvas.height, 30 + Math.random() * 100, 15 + Math.random() * 50, Math.random(), 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                ctx.strokeStyle = '#92400e'; ctx.lineWidth = 1;
-                for (let x = 0; x < canvas.width; x += 64) {
-                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-                }
-                for (let y = 0; y < canvas.height; y += 64) {
-                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-                }
+
+                return new THREE.CanvasTexture(canvas);
+            },
+
+            createSaturnRingTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512; canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+
+                const grad = ctx.createLinearGradient(0, 0, 512, 0);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(0.15, 'rgba(215, 185, 135, 0.85)'); // Ring D/C
+                grad.addColorStop(0.55, 'rgba(185, 155, 105, 0.95)'); // Ring B
+                grad.addColorStop(0.70, 'rgba(10, 10, 20, 0.98)');   // CASSINI DIVISION (ช่องว่างแคสสินี)
+                grad.addColorStop(0.74, 'rgba(195, 165, 115, 0.8)');  // Ring A
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 512, 64);
+                return new THREE.CanvasTexture(canvas);
             }
-            return new THREE.CanvasTexture(canvas);
+        };
+
+        /* ==========================================================================
+           4. THREE.JS SCENE SETUP & OBJECT CREATION
+           ========================================================================== */
+        let scene, camera, renderer, controls;
+        let celestialObjects = {};
+        let orbitLinesGroup = new THREE.Group();
+        let labelsContainer = document.getElementById('labels-container');
+        let isOrbiting = true;
+        let orbitSpeedMultiplier = 1.0;
+        let showLabels = true;
+        let isTeachingScale = true; // Toggle Teaching vs Real Scale
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let targetFocusObject = null;
+        let cloudMeshEarth = null;
+
+        // Config scale & spacing
+        const planetConfigs = [
+            { id: 'mercury', name: 'ดาวพุธ', radius: 1.2, dist: 28, realDist: 60, speed: 0.04, color: '#a6a6a6', stripe: '#686868', stripes: 6 },
+            { id: 'venus', name: 'ดาวศุกร์', radius: 2.0, dist: 42, realDist: 100, speed: 0.025, color: '#e3bb76', stripe: '#c79248', stripes: 8 },
+            { id: 'earth', name: 'โลก', radius: 2.3, dist: 58, realDist: 140, speed: 0.018, isEarth: true },
+            { id: 'mars', name: 'ดาวอังคาร', radius: 1.6, dist: 76, realDist: 190, speed: 0.014, color: '#c1440e', stripe: '#8a2e07', stripes: 6, isMars: true, spots: [{x: 280, y: 220, rx: 20, ry: 18, color: '#6e1d03', border: '#ff8866'}] },
+            { id: 'jupiter', name: 'ดาวพฤหัสบดี', radius: 6.5, dist: 130, realDist: 320, speed: 0.008, color: '#b07f35', stripe: '#d9a05b', stripes: 24, spots: [{x: 700, y: 320, rx: 45, ry: 30, color: '#cc3300', border: '#ff9988'}] },
+            { id: 'saturn', name: 'ดาวเสาร์', radius: 5.2, dist: 180, realDist: 460, speed: 0.006, color: '#e2bf7d', stripe: '#b59353', stripes: 15, ring: true },
+            { id: 'uranus', name: 'ดาวยูเรนัส', radius: 3.6, dist: 230, realDist: 600, speed: 0.004, color: '#4b70dd', stripe: '#70d6ff', stripes: 10, ring: true, tilt: Math.PI / 2 },
+            { id: 'neptune', name: 'ดาวเนปจูน', radius: 3.4, dist: 275, realDist: 720, speed: 0.003, color: '#274687', stripe: '#4169e1', stripes: 12, spots: [{x: 450, y: 280, rx: 20, ry: 14, color: '#0f1f45'}] }
+        ];
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050711, 0.0006);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3000);
+            camera.position.set(0, 130, 290);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 1800;
+            controls.minDistance = 5;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0x333344, 1.4);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.PointLight(0xffffff, 2.5, 2000, 0.3);
+            scene.add(sunLight);
+
+            // Background Starfield
+            createStarfield();
+
+            // Create Sun
+            createSun();
+
+            // Create Planets & Orbits
+            planetConfigs.forEach(cfg => createPlanet(cfg));
+
+            // Create 3D Asteroid Belt (Polyhedron Asteroid Rocks)
+            createAsteroidBelt();
+
+            // Create Kuiper Belt & Oort Cloud
+            createKuiperBelt();
+            createOortCloud();
+
+            scene.add(orbitLinesGroup);
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('click', onCanvasClick);
+
+            // Start Loop
+            animate();
         }
 
-        function createDefaultTexture(key) {
-            if (key === 'sun') return createSunTexture();
-            if (key === 'mercury') return createMercuryTexture();
-            if (key === 'venus') return createVenusTexture();
-            if (key === 'earth') return createEarthTexture();
-            if (key === 'mars') return createMarsTexture();
-            if (key === 'jupiter') return createJupiterTexture();
-            if (key === 'saturn') return createSaturnTexture();
-            if (key === 'uranus') return createUranusTexture();
-            if (key === 'neptune') return createNeptuneTexture();
-            if (key === 'pluto') return createPlutoTexture();
-            return createMercuryTexture();
-        }
+        /* --- Starfield --- */
+        function createStarfield() {
+            const count = 7000;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
 
-        function openTextureModal(planetId = null) {
-            const modal = document.getElementById('texture-modal');
-            modal.classList.remove('hidden');
-            const select = document.getElementById('texture-planet-select');
-            if (planetId && select) {
-                select.value = planetId;
-            } else if (selectedObjectId && select && CELESTIAL_DATA[selectedObjectId]) {
-                select.value = selectedObjectId;
+            for (let i = 0; i < count * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 2000;
+                positions[i + 1] = (Math.random() - 0.5) * 2000;
+                positions[i + 2] = (Math.random() - 0.5) * 2000;
+
+                colors[i] = 0.8 + Math.random() * 0.2;
+                colors[i + 1] = 0.8 + Math.random() * 0.2;
+                colors[i + 2] = 1.0;
             }
-            updateTextureModalPreview();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({ size: 1.2, vertexColors: true, transparent: true, opacity: 0.85 });
+            const stars = new THREE.Points(geometry, material);
+            scene.add(stars);
         }
 
-        function closeTextureModal() {
-            document.getElementById('texture-modal').classList.add('hidden');
+        /* --- Sun & Solar Prominences --- */
+        function createSun() {
+            const sunGeo = new THREE.SphereGeometry(14, 64, 64);
+            const sunTex = TextureGen.createSunTexture();
+            const sunMat = new THREE.MeshBasicMaterial({ map: sunTex });
+            const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+            
+            // Solar Glow Corona Halo
+            const glowGeo = new THREE.SphereGeometry(17, 32, 32);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: 0xffaa00,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.BackSide
+            });
+            const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+            sunMesh.add(glowMesh);
+
+            sunMesh.userData = { id: 'sun', name: 'ดวงอาทิตย์', angle: 0, speed: 0, dist: 0, radius: 14 };
+            scene.add(sunMesh);
+            celestialObjects['sun'] = sunMesh;
+
+            createFloatingLabel('sun', 'ดวงอาทิตย์ (Sun)', sunMesh);
         }
 
-        function openTextureModalForCurrent() {
-            if (selectedObjectId && CELESTIAL_DATA[selectedObjectId]) {
-                openTextureModal(selectedObjectId);
+        /* --- Planet Creation --- */
+        function createPlanet(cfg) {
+            const geo = new THREE.SphereGeometry(cfg.radius, 32, 32);
+            let tex;
+            if (cfg.isEarth) {
+                tex = TextureGen.createEarthTexture();
             } else {
-                openTextureModal('earth');
+                tex = TextureGen.createPlanetTexture(cfg.color, cfg.stripe, cfg.stripes, cfg.spots || [], cfg.isMars);
+            }
+
+            const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0.15 });
+            const mesh = new THREE.Mesh(geo, mat);
+
+            if (cfg.tilt) mesh.rotation.z = cfg.tilt;
+
+            // Earth Atmosphere & Cloud Layer
+            if (cfg.isEarth) {
+                // Cloud Mesh
+                const cloudGeo = new THREE.SphereGeometry(cfg.radius + 0.08, 32, 32);
+                const cloudTex = TextureGen.createCloudTexture();
+                const cloudMat = new THREE.MeshStandardMaterial({ map: cloudTex, transparent: true, opacity: 0.85 });
+                cloudMeshEarth = new THREE.Mesh(cloudGeo, cloudMat);
+                mesh.add(cloudMeshEarth);
+
+                // Earth Blue Glow
+                const glowGeo = new THREE.SphereGeometry(cfg.radius + 0.25, 32, 32);
+                const glowMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.15, side: THREE.BackSide });
+                mesh.add(new THREE.Mesh(glowGeo, glowMat));
+            }
+
+            // Saturn / Uranus Rings with Cassini Division
+            if (cfg.ring) {
+                const ringGeo = new THREE.RingGeometry(cfg.radius * 1.4, cfg.radius * 2.5, 64);
+                // Adjust UV mapping for ring
+                const pos = ringGeo.attributes.position;
+                const uv = ringGeo.attributes.uv;
+                for (let i = 0; i < pos.count; i++) {
+                    const vertex = new THREE.Vector3().fromBufferAttribute(pos, i);
+                    uv.setXY(i, (vertex.length() - cfg.radius * 1.4) / (cfg.radius * 1.1), 1);
+                }
+
+                const ringTex = TextureGen.createSaturnRingTexture();
+                const ringMat = new THREE.MeshStandardMaterial({ map: ringTex, side: THREE.DoubleSide, transparent: true });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.rotation.x = Math.PI / 2;
+                mesh.add(ringMesh);
+            }
+
+            const activeDist = isTeachingScale ? cfg.dist : cfg.realDist;
+            mesh.userData = { 
+                id: cfg.id, 
+                name: cfg.name, 
+                teachingDist: cfg.dist, 
+                realDist: cfg.realDist,
+                dist: activeDist, 
+                speed: cfg.speed, 
+                angle: Math.random() * Math.PI * 2, 
+                radius: cfg.radius 
+            };
+            
+            scene.add(mesh);
+            celestialObjects[cfg.id] = mesh;
+
+            // Create Orbit Line Mesh
+            const orbitGeo = new THREE.RingGeometry(activeDist - 0.2, activeDist + 0.2, 128);
+            const orbitMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.18 });
+            const orbitMesh = new THREE.Mesh(orbitGeo, orbitMat);
+            orbitMesh.rotation.x = Math.PI / 2;
+            orbitLinesGroup.add(orbitMesh);
+            mesh.userData.orbitMesh = orbitMesh;
+
+            createFloatingLabel(cfg.id, cfg.name, mesh);
+        }
+
+        /* --- 3D Asteroid Belt Rocks --- */
+        function createAsteroidBelt() {
+            const asteroidGroup = new THREE.Group();
+            const count = 1200;
+            const rockGeo = new THREE.DodecahedronGeometry(0.5, 1);
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.9 });
+
+            for (let i = 0; i < count; i++) {
+                const radius = 95 + Math.random() * 22;
+                const angle = Math.random() * Math.PI * 2;
+                const y = (Math.random() - 0.5) * 8;
+
+                const rock = new THREE.Mesh(rockGeo, rockMat);
+                rock.position.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+                const scale = Math.random() * 0.8 + 0.3;
+                rock.scale.set(scale, scale, scale);
+                rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+                asteroidGroup.add(rock);
+            }
+
+            asteroidGroup.userData = { id: 'asteroid_belt', name: 'แถบดาวเคราะห์น้อย', dist: 105, radius: 5 };
+            scene.add(asteroidGroup);
+            celestialObjects['asteroid_belt'] = asteroidGroup;
+
+            createFloatingLabel('asteroid_belt', 'แถบดาวเคราะห์น้อย', asteroidGroup, { x: 0, y: 6, z: 105 });
+        }
+
+        function createKuiperBelt() {
+            const count = 2500;
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(count * 3);
+
+            for (let i = 0; i < count; i++) {
+                const radius = 310 + Math.random() * 70;
+                const angle = Math.random() * Math.PI * 2;
+                const y = (Math.random() - 0.5) * 18;
+
+                pos[i * 3] = Math.cos(angle) * radius;
+                pos[i * 3 + 1] = y;
+                pos[i * 3 + 2] = Math.sin(angle) * radius;
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const mat = new THREE.PointsMaterial({ size: 1.5, color: 0x99ddff, transparent: true, opacity: 0.65 });
+            const belt = new THREE.Points(geo, mat);
+            belt.userData = { id: 'kuiper_belt', name: 'แถบไคเปอร์', dist: 345, radius: 10 };
+            scene.add(belt);
+            celestialObjects['kuiper_belt'] = belt;
+
+            createFloatingLabel('kuiper_belt', 'แถบไคเปอร์', belt, { x: 0, y: 12, z: 335 });
+        }
+
+        function createOortCloud() {
+            const count = 3500;
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(count * 3);
+
+            for (let i = 0; i < count; i++) {
+                const u = Math.random();
+                const v = Math.random();
+                const theta = u * 2.0 * Math.PI;
+                const phi = Math.acos(2.0 * v - 1.0);
+                const r = 580 + Math.random() * 160;
+
+                pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+                pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+                pos[i * 3 + 2] = r * Math.cos(phi);
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const mat = new THREE.PointsMaterial({ size: 1.6, color: 0xcce6ff, transparent: true, opacity: 0.28 });
+            const cloud = new THREE.Points(geo, mat);
+            cloud.userData = { id: 'oort_cloud', name: 'เมฆของออร์ต', radius: 20 };
+            scene.add(cloud);
+            celestialObjects['oort_cloud'] = cloud;
+        }
+
+        /* --- 3D HTML Floating Labels --- */
+        function createFloatingLabel(id, text, targetObject, fixedOffset = null) {
+            const label = document.createElement('div');
+            label.className = 'planet-label glass-panel px-2.5 py-1 rounded-xl text-xs font-medium text-cyan-300 shadow-md border border-cyan-500/30 flex items-center space-x-1.5';
+            label.innerHTML = `<span>${text}</span>`;
+            label.onclick = () => {
+                initAudioEngine();
+                playWarpSFX();
+                focusOnObject(id);
+            };
+            labelsContainer.appendChild(label);
+            targetObject.userData.labelEl = label;
+            targetObject.userData.fixedOffset = fixedOffset;
+        }
+
+        function updateLabelsPosition() {
+            if (!showLabels) return;
+            const tempV = new THREE.Vector3();
+
+            Object.values(celestialObjects).forEach(obj => {
+                if (!obj.userData.labelEl) return;
+                
+                if (obj.userData.fixedOffset) {
+                    tempV.set(obj.userData.fixedOffset.x, obj.userData.fixedOffset.y, obj.userData.fixedOffset.z);
+                } else {
+                    obj.getWorldPosition(tempV);
+                    tempV.y += (obj.userData.radius || 2) + 2.5;
+                }
+
+                tempV.project(camera);
+
+                if (tempV.z > 1) {
+                    obj.userData.labelEl.style.opacity = '0';
+                    return;
+                }
+
+                const x = (tempV.x *  .5 + .5) * window.innerWidth;
+                const y = (tempV.y * -.5 + .5) * window.innerHeight;
+
+                obj.userData.labelEl.style.transform = `translate(-50%, -100%) translate(${x}px,${y}px)`;
+                obj.userData.labelEl.style.opacity = '1';
+            });
+        }
+
+        /* ==========================================================================
+           5. ANIMATION & CAMERA FOCUS CONTROLS
+           ========================================================================== */
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Orbit & Self-rotation
+            if (isOrbiting) {
+                Object.values(celestialObjects).forEach(obj => {
+                    if (obj.userData.dist > 0 && obj.userData.speed) {
+                        obj.userData.angle += obj.userData.speed * 0.2 * orbitSpeedMultiplier;
+                        obj.position.x = Math.cos(obj.userData.angle) * obj.userData.dist;
+                        obj.position.z = Math.sin(obj.userData.angle) * obj.userData.dist;
+                    }
+                    obj.rotation.y += 0.005;
+
+                    // Earth Cloud Rotation
+                    if (cloudMeshEarth) {
+                        cloudMeshEarth.rotation.y += 0.003;
+                    }
+                });
+            }
+
+            // Smooth Camera Focus Lerp
+            if (targetFocusObject) {
+                const targetPos = new THREE.Vector3();
+                targetFocusObject.getWorldPosition(targetPos);
+                
+                controls.target.lerp(targetPos, 0.05);
+
+                const offset = targetFocusObject.userData.radius ? targetFocusObject.userData.radius * 4.5 + 8 : 45;
+                const desiredCamPos = new THREE.Vector3()
+                    .copy(targetPos)
+                    .add(new THREE.Vector3(offset * 0.8, offset * 0.5, offset));
+
+                camera.position.lerp(desiredCamPos, 0.05);
+            }
+
+            controls.update();
+            updateLabelsPosition();
+            renderer.render(scene, camera);
+        }
+
+        /* --- Click Interaction (Raycaster) --- */
+        function onCanvasClick(e) {
+            initAudioEngine();
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const selectableMeshes = Object.values(celestialObjects);
+            const intersects = raycaster.intersectObjects(selectableMeshes, true);
+
+            if (intersects.length > 0) {
+                let hitObj = intersects[0].object;
+                while (hitObj.parent && !hitObj.userData.id) {
+                    hitObj = hitObj.parent;
+                }
+                if (hitObj.userData.id) {
+                    playWarpSFX();
+                    focusOnObject(hitObj.userData.id);
+                }
             }
         }
 
-        function updateTextureModalPreview() {
-            const select = document.getElementById('texture-planet-select');
-            if (!select) return;
-            const planetId = select.value;
-            const data = CELESTIAL_DATA[planetId];
+        function focusOnObject(objectId) {
+            const obj = celestialObjects[objectId];
+            if (!obj) return;
+
+            targetFocusObject = obj;
+            document.getElementById('celestial-select').value = objectId;
+
+            openDetailModal(objectId);
+        }
+
+        function resetCamera() {
+            playClickSFX();
+            targetFocusObject = null;
+            controls.target.set(0, 0, 0);
+            camera.position.set(0, 130, 290);
+            closeDetailModal();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        /* ==========================================================================
+           6. UI MODAL & EDUCATIONAL CONTENT MANAGEMENT
+           ========================================================================== */
+        function openDetailModal(id) {
+            playChimeSFX();
+            const data = solarSystemData[id];
             if (!data) return;
 
-            document.getElementById('texture-target-name').innerText = `${data.nameTh} (${data.nameEn})`;
-            const currentUrl = customTextureURLs[planetId];
-            const previewImg = document.getElementById('texture-preview-img');
-            const placeholder = document.getElementById('texture-preview-placeholder');
-            const badge = document.getElementById('texture-status-badge');
-            const drawerBadge = document.getElementById('drawer-texture-badge');
+            document.getElementById('modal-title').innerText = data.name;
+            document.getElementById('modal-subtitle').innerText = data.subtitle;
+            document.getElementById('modal-icon').innerText = data.icon;
 
-            if (currentUrl) {
-                previewImg.src = currentUrl;
-                previewImg.classList.remove('hidden');
-                placeholder.classList.add('hidden');
-                badge.innerText = 'ใช้งานภาพที่อัปโหลด';
-                badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800';
-                if (drawerBadge && selectedObjectId === planetId) {
-                    drawerBadge.innerText = 'Custom Texture';
-                    drawerBadge.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800';
+            // Render Highlights
+            const highlightsContainer = document.getElementById('modal-highlights-container');
+            highlightsContainer.innerHTML = data.highlights.map(h => `
+                <div class="glass-card p-3 rounded-2xl flex items-start space-x-3 border border-slate-700/50">
+                    <div class="p-2.5 rounded-xl bg-space-900 ${h.color} text-base flex-shrink-0">
+                        <i class="fa-solid ${h.icon}"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xs sm:text-sm font-semibold text-slate-100">${h.title}</h4>
+                        <p class="text-[11px] sm:text-xs text-slate-300 mt-0.5 leading-relaxed font-light">${h.desc}</p>
+                    </div>
+                </div>
+            `).join('');
+
+            // Render Description
+            document.getElementById('modal-description').innerHTML = data.description;
+
+            // Render Stats Grid
+            const statsGrid = document.getElementById('modal-stats-grid');
+            const statLabels = {
+                diameter: 'เส้นผ่านศูนย์กลาง',
+                mass: 'มวลสาร',
+                distance: 'ระยะห่างจากดวงอาทิตย์',
+                temp: 'อุณหภูมิพื้นผิว/บรรยากาศ',
+                satellites: 'จำนวนดาวบริวาร',
+                rotation: 'คาบการหมุนรอบตัวเอง',
+                orbit: 'คาบการโคจรรอบดวงอาทิตย์'
+            };
+            statsGrid.innerHTML = Object.entries(data.stats).map(([k, v]) => `
+                <div class="glass-card p-3 rounded-xl border border-slate-800">
+                    <span class="text-[10px] text-cyan-400 font-medium block">${statLabels[k] || k}</span>
+                    <span class="text-xs font-semibold text-slate-100 mt-0.5 block">${v}</span>
+                </div>
+            `).join('');
+
+            // Embed Working YouTube Video (YouTube No-Cookie for smooth playback)
+            const iframe = document.getElementById('video-iframe');
+            const ytUrl = `https://www.youtube-nocookie.com/embed/${data.youtubeId}?rel=0&enablejsapi=1`;
+            iframe.src = ytUrl;
+
+            // Set Direct YouTube Link as Fallback
+            const directLink = document.getElementById('youtube-direct-link');
+            directLink.href = `https://www.youtube.com/watch?v=${data.youtubeId}`;
+
+            // Render Subtitles Script
+            const scriptContainer = document.getElementById('script-container');
+            scriptContainer.innerHTML = data.script.map(s => `
+                <div class="p-3 rounded-xl bg-space-900/80 border border-slate-800 hover:border-cyan-500/40 transition">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-mono font-bold text-cyan-400"><i class="fa-solid fa-play text-[9px] mr-1"></i> ${s.time}</span>
+                        <span class="text-[10px] text-slate-500">TH / EN</span>
+                    </div>
+                    <p class="text-xs font-medium text-slate-200">${s.th}</p>
+                    <p class="text-[11px] text-slate-400 italic mt-0.5">${s.en}</p>
+                </div>
+            `).join('');
+
+            // Open Side Drawer Modal
+            const modal = document.getElementById('detail-modal');
+            modal.classList.remove('translate-x-full');
+            switchTab('overview');
+        }
+
+        function closeDetailModal() {
+            playClickSFX();
+            const modal = document.getElementById('detail-modal');
+            modal.classList.add('translate-x-full');
+            document.getElementById('video-iframe').src = '';
+        }
+
+        function switchTab(tabId) {
+            playClickSFX();
+            ['overview', 'data', 'video'].forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                const content = document.getElementById(`tab-content-${t}`);
+                if (t === tabId) {
+                    btn.className = 'py-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold text-cyan-400 border-b-2 border-cyan-400 transition flex items-center space-x-2';
+                    content.classList.remove('hidden');
+                } else {
+                    btn.className = 'py-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold text-slate-400 hover:text-slate-200 border-b-2 border-transparent transition flex items-center space-x-2';
+                    content.classList.add('hidden');
                 }
-            } else {
-                previewImg.src = '';
-                previewImg.classList.add('hidden');
-                placeholder.classList.remove('hidden');
-                badge.innerText = 'ใช้งานภาพเริ่มต้น';
-                badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700';
-                if (drawerBadge && selectedObjectId === planetId) {
-                    drawerBadge.innerText = 'Texture ปกติ';
-                    drawerBadge.className = 'text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400';
+            });
+        }
+
+        /* --- Quick Category Filters --- */
+        function filterCategory(cat) {
+            playClickSFX();
+            Object.values(celestialObjects).forEach(obj => {
+                const id = obj.userData.id;
+                const data = solarSystemData[id];
+                if (!data) return;
+
+                if (cat === 'all' || data.type === cat) {
+                    obj.visible = true;
+                    if (obj.userData.labelEl) obj.userData.labelEl.style.display = 'flex';
+                } else {
+                    obj.visible = false;
+                    if (obj.userData.labelEl) obj.userData.labelEl.style.display = 'none';
                 }
-            }
+            });
         }
 
-        function handleTextureFileInput(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const planetId = document.getElementById('texture-planet-select').value;
-                applyTextureFile(planetId, file);
-            }
+        /* --- Controls Bar Actions --- */
+        function toggleScaleMode() {
+            playClickSFX();
+            isTeachingScale = !isTeachingScale;
+            document.getElementById('scale-mode-label').innerText = isTeachingScale ? 'สเกลการสอน' : 'สเกลจริง';
+
+            // Re-position planets & orbit rings
+            Object.values(celestialObjects).forEach(obj => {
+                if (obj.userData.teachingDist) {
+                    const newDist = isTeachingScale ? obj.userData.teachingDist : obj.userData.realDist;
+                    obj.userData.dist = newDist;
+                    obj.position.x = Math.cos(obj.userData.angle) * newDist;
+                    obj.position.z = Math.sin(obj.userData.angle) * newDist;
+
+                    if (obj.userData.orbitMesh) {
+                        obj.userData.orbitMesh.geometry.dispose();
+                        obj.userData.orbitMesh.geometry = new THREE.RingGeometry(newDist - 0.2, newDist + 0.2, 128);
+                    }
+                }
+            });
         }
 
-        function handleTextureDrop(e) {
-            e.preventDefault();
-            document.getElementById('drop-zone').classList.remove('border-amber-400');
-            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                const planetId = document.getElementById('texture-planet-select').value;
-                applyTextureFile(planetId, e.dataTransfer.files[0]);
-            }
+        function toggleOrbitAnimation() {
+            playClickSFX();
+            isOrbiting = !isOrbiting;
+            const icon = document.getElementById('icon-toggle-orbit');
+            icon.className = isOrbiting ? 'fa-solid fa-pause' : 'fa-solid fa-play';
         }
 
-        // RELIABLE BASE64 DATA URL TEXTURE APPLIER
-        function applyTextureFile(planetId, file) {
-            if (!file || !CELESTIAL_DATA[planetId]) return;
-            const mesh = celestialMeshes[planetId];
-            if (!mesh) {
-                showToast('ไม่พบโมเดล 3D ของดาวดวงนี้', 'error');
+        function updateOrbitSpeed(val) {
+            orbitSpeedMultiplier = parseFloat(val);
+            document.getElementById('speed-label').innerText = `${orbitSpeedMultiplier.toFixed(1)}x`;
+        }
+
+        function toggleOrbitLines() {
+            playClickSFX();
+            orbitLinesGroup.visible = !orbitLinesGroup.visible;
+            const btn = document.getElementById('btn-toggle-lines');
+            btn.classList.toggle('bg-cyan-500/20');
+            btn.classList.toggle('bg-slate-800');
+        }
+
+        function toggleLabels() {
+            playClickSFX();
+            showLabels = !showLabels;
+            labelsContainer.style.display = showLabels ? 'block' : 'none';
+            const btn = document.getElementById('btn-toggle-labels');
+            btn.classList.toggle('bg-cyan-500/20');
+            btn.classList.toggle('bg-slate-800');
+        }
+
+        /* ==========================================================================
+           7. QUIZ / KNOWLEDGE CHECK FEATURE
+           ========================================================================== */
+        const quizData = [
+            {
+                q: "ภูเขาไฟที่สูงที่สุดในระบบสุริยะชื่อว่าอะไร และตั้งอยู่บนดาวดวงใด?",
+                options: ["ภูเขาไฟเอเวอเรสต์ บนโลก", "ภูเขาไฟโอลิมปัส (Olympus Mons) บนดาวอังคาร", "แอ่งแคลอริส บนดาวพุธ", "จุดแดงใหญ่ บนดาวพฤหัสบดี"],
+                ans: 1,
+                explain: "ภูเขาไฟโอลิมปัส (Olympus Mons) บนดาวอังคาร สูงถึง 21.9 กม. ซึ่งสูงกว่ายอดเขาเอเวอเรสต์เกือบ 3 เท่า!"
+            },
+            {
+                q: "ช่องว่างแคสสินี (Cassini Division) คืออะไรและพบที่ดาวดวงใด?",
+                options: ["รอยแตกบนดาวพุธ", "ช่องว่างกว้างใหญ่ระหว่างวงแหวนของดาวเสาร์", "จุดมืดบนดาวเนปจูน", "พายุหมุนบนดาวศุกร์"],
+                ans: 1,
+                explain: "ช่องว่างแคสสินีคือช่องว่างกว้างกว่า 4,800 กิโลเมตรที่แบ่งระหว่างวงแหวนชั้น A และ B ของดาวเสาร์ เกิดจากแรงโน้มถ่วงของดวงจันทร์มีมัส"
+            },
+            {
+                q: "ปรากฏการณ์จุดมืดดวงอาทิตย์ (Sunspots) เกิดจากอะไร?",
+                options: ["เมฆหนาบังแสงอาทิตย์", "สนามแม่เหล็กเข้มข้นยับยั้งการพาความร้อนทำให้อุณหภูมิต่ำกว่าบริเวณโดยรอบ", "อุกกาบาตชนดวงอาทิตย์", "แก๊สฮีเลียมไหม้หมด"],
+                ans: 1,
+                explain: "จุดมืดเกิดจากสนามแม่เหล็กดวงอาทิตย์ที่เข้มข้น ขัดขวางการพาความร้อน ทำให้บริเวณนั้นเย็นกว่าพื้นที่ข้างเคียงจึงมองเห็นเป็นจุดมืด"
+            }
+        ];
+
+        let currentQuizIdx = 0;
+        let score = 0;
+
+        function openQuizModal() {
+            playChimeSFX();
+            currentQuizIdx = 0;
+            score = 0;
+            renderQuizQuestion();
+            document.getElementById('quiz-modal').classList.remove('hidden');
+        }
+
+        function closeQuizModal() {
+            playClickSFX();
+            document.getElementById('quiz-modal').classList.add('hidden');
+        }
+
+        function renderQuizQuestion() {
+            const container = document.getElementById('quiz-content-area');
+            if (currentQuizIdx >= quizData.length) {
+                container.innerHTML = `
+                    <div class="text-center py-6 space-y-4">
+                        <div class="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 text-3xl flex items-center justify-center mx-auto border border-amber-500/40">
+                            <i class="fa-solid fa-trophy animate-bounce"></i>
+                        </div>
+                        <h4 class="text-2xl font-bold text-white">ยินดีด้วย! คุณทำแบบทดสอบเสร็จสิ้น</h4>
+                        <p class="text-lg text-cyan-300">คะแนนของคุณ: <span class="font-bold text-2xl text-amber-400">${score}</span> / ${quizData.length}</p>
+                        <button onclick="openQuizModal()" class="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold rounded-xl transition shadow-lg">
+                            ลองทำใหม่อีกครั้ง
+                        </button>
+                    </div>
+                `;
                 return;
             }
 
-            // Target core planet body mesh
-            let coreMesh = mesh;
-            if (!coreMesh.material && coreMesh.children.length > 0) {
-                coreMesh = coreMesh.children.find(c => c.isMesh && c.material) || coreMesh;
-            }
-
-            // Save initial texture if not saved
-            if (!originalTextures[planetId]) {
-                originalTextures[planetId] = coreMesh.material.map;
-            }
-
-            // Read file as Base64 Data URL to bypass iframe blob/CORS restrictions
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const dataUrl = e.target.result;
-                const loader = new THREE.TextureLoader();
-                
-                loader.load(
-                    dataUrl,
-                    (texture) => {
-                        if (THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
-                        if (THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
-                        texture.needsUpdate = true;
-
-                        coreMesh.material.map = texture;
-                        coreMesh.material.needsUpdate = true;
-                        customTextureURLs[planetId] = dataUrl;
-
-                        updateTextureModalPreview();
-                        SoundFX.playCorrect();
-                        showToast(`เปลี่ยนภาพพื้นผิว 3D ของ ${CELESTIAL_DATA[planetId].nameTh} สำเร็จ!`, 'success');
-                    },
-                    undefined,
-                    (err) => {
-                        console.error('Texture load error:', err);
-                        SoundFX.playWrong();
-                        showToast('ไม่สามารถอ่านไฟล์รูปภาพได้ โปรดใช้ไฟล์ .JPG หรือ .PNG', 'error');
-                        coreMesh.material.map = originalTextures[planetId] || coreMesh.material.map;
-                        coreMesh.material.needsUpdate = true;
-                    }
-                );
-            };
-
-            reader.onerror = function() {
-                SoundFX.playWrong();
-                showToast('เกิดข้อผิดพลาดในการเปิดไฟล์ภาพ', 'error');
-            };
-
-            reader.readAsDataURL(file);
+            const q = quizData[currentQuizIdx];
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between text-xs text-cyan-400 font-semibold">
+                        <span>คำถามข้อที่ ${currentQuizIdx + 1} จาก ${quizData.length}</span>
+                        <span>คะแนนสะสม: ${score}</span>
+                    </div>
+                    <p class="text-base font-semibold text-slate-100">${q.q}</p>
+                    <div class="space-y-2">
+                        ${q.options.map((opt, i) => `
+                            <button onclick="checkAnswer(${i})" class="w-full text-left p-3.5 rounded-2xl bg-space-900/80 hover:bg-space-800 border border-slate-700/80 text-xs sm:text-sm text-slate-200 transition flex items-center justify-between">
+                                <span>${opt}</span>
+                                <i class="fa-regular fa-circle text-slate-500"></i>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
         }
 
-        function resetPlanetTexture(planetId = null) {
-            const targetId = planetId || document.getElementById('texture-planet-select').value;
-            const mesh = celestialMeshes[targetId];
-            if (mesh && originalTextures[targetId]) {
-                mesh.material.map = originalTextures[targetId];
-                mesh.material.needsUpdate = true;
-                delete customTextureURLs[targetId];
-                updateTextureModalPreview();
-                SoundFX.playClick();
-                showToast(`คืนค่าพื้นผิวเดิมของ ${CELESTIAL_DATA[targetId].nameTh} เรียบร้อย`, 'info');
-            }
+        function checkAnswer(selectedIdx) {
+            playClickSFX();
+            const q = quizData[currentQuizIdx];
+            const isCorrect = selectedIdx === q.ans;
+            if (isCorrect) score++;
+
+            const container = document.getElementById('quiz-content-area');
+            container.innerHTML += `
+                <div class="p-4 rounded-2xl ${isCorrect ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200' : 'bg-rose-950/80 border-rose-500/50 text-rose-200'} border mt-4 text-xs space-y-2">
+                    <div class="font-bold flex items-center space-x-2 text-sm">
+                        <i class="fa-solid ${isCorrect ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-rose-400'}"></i>
+                        <span>${isCorrect ? 'ถูกต้อง!' : 'ยังไม่ถูกต้อง'}</span>
+                    </div>
+                    <p>${q.explain}</p>
+                    <button onclick="nextQuestion()" class="mt-2 px-4 py-1.5 bg-space-800 hover:bg-space-700 text-white rounded-xl font-semibold transition">
+                        ข้อถัดไป <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+            `;
         }
 
-        function resetAllPlanetTextures() {
-            Object.keys(originalTextures).forEach(id => {
-                if (celestialMeshes[id] && originalTextures[id]) {
-                    celestialMeshes[id].material.map = originalTextures[id];
-                    celestialMeshes[id].material.needsUpdate = true;
-                }
-            });
-            customTextureURLs = {};
-            updateTextureModalPreview();
-            SoundFX.playClick();
-            showToast('คืนค่าพื้นผิวเดิมของดาวทุกดวงเรียบร้อย', 'info');
+        function nextQuestion() {
+            playClickSFX();
+            currentQuizIdx++;
+            renderQuizQuestion();
         }
+
+        // Initialize 3D Application on Window Load
+        window.onload = function() {
+            init3D();
+        };
     </script>
 </body>
 </html>
